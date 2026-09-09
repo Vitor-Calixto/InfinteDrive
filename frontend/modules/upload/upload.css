@@ -1,0 +1,11 @@
+.upq{margin-top:10px;background:#141414;border:1px solid #2a2a2a;border-radius:12px;padding:12px 14px}
+.upq-head{font-size:13px;color:#d4d4d8;margin-bottom:8px}
+.upq-err{color:#f87171}
+.upq-row{display:grid;grid-template-columns:24px 1fr auto;gap:4px 10px;align-items:center;padding:7px 0;border-top:1px solid #222;font-size:12px}
+.upq-row:first-of-type{border-top:0}
+.upq-ico{font-size:14px}
+.upq-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.upq-sub{color:#a1a1aa;white-space:nowrap}
+.upq-bar{grid-column:1/-1;height:6px;background:#2e2e2e;border-radius:999px;overflow:hidden}
+.upq-bar>div{height:100%;background:linear-gradient(90deg,#1DB954,#7bf0a4);border-radius:999px;transition:width .2s}
+.proc-banner{margin-top:10px;background:linear-gradient(90deg,rgba(29,185,84,.16),rgba(29,185,84,.05));border:1px solid rgba(29,185,84,.45);border-radius:12px;padding:10px 14px;font-size:13px;color:#d4f5df}

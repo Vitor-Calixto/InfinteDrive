@@ -46,9 +46,9 @@ Drive bonito pra todo mundo: arrasta foto, toca música, organiza em playlist, t
 **Backend — o motor** (`backend/`, Node 20+ ESM + Express 5, porta 4000):
 `ssh2` (deploy + SFTP), `bcryptjs` (senhas e PINs em hash), `jsonwebtoken` (sessão 12h, offline), `google-auth-library` (login com Google), `multer` (uploads), `sharp` (imagem/WebP/thumb), `ffmpeg-static` (áudio/vídeo, binário local), `music-metadata` (duração/capa do álbum), `pdf-parse` (texto do PDF p/ busca), `yauzl` (valida zip), `archiver` (CLI), `nodemailer` (reset de senha), `express-rate-limit` + `helmet` (blindagem), `uuid`.
 
-**Frontend — o rosto** (`frontend/`, 1 `index.html` + `css/style.css` + `js/app.js`): HTML + CSS próprio estilo Spotify (zero CDN, 100% offline) + Vanilla JS. Views Início/Planos/Lixeira/Admin, `<audio>/<video>` nativo, modal com PDF embutido, menu ⋮ por card, `EventSource` pros logs, `fetch` com JWT, PWA (`manifest.json` + `sw.js` + ícones), gzip no servidor (-70% texto).
+**Frontend — o rosto** (`frontend/`, 1 `index.html` + `css/style.css` + `js/app.js`): HTML + CSS próprio estilo Spotify (zero CDN, 100% offline) + Vanilla JS. Views Início/Uso/Planos/Importar/Memórias/Lixeira/Admin, `<audio>/<video>` nativo, player fixo, modal com PDF embutido + compartilhar, menu ⋮ por card, `EventSource` pros logs, `fetch` com JWT, PWA (`manifest.json` + `sw.js` + ícones), gzip no servidor (-70% texto).
 
-**Persistência:** arquivos JSON atômicos em `backend/data/` (tmp+rename + lock por coleção). Sem Postgres: `users, storage, playlists, profiles, search-index, apps, deploys, servers, contabo, queue, audit`. Blobs em `data/files/<userId>/<uuid>.bin` (sem extensão, nunca executável).
+**Persistência:** arquivos JSON atômicos em `backend/data/` (tmp+rename + lock por coleção). Sem Postgres: `users, storage, playlists, profiles, search-index, shares, apps, deploys, servers, contabo, queue, audit`. Blobs em `data/files/<userId>/<uuid>.bin` (sem extensão, nunca executável).
 
 **Infra:** qualquer VPS Ubuntu (testado local; Contabo Cloud VPS 10: 4vCPU/8GB/75GB). `ffmpeg` via npm, sem apt. Tier S3 futuro pro frio.
 
@@ -98,6 +98,7 @@ contabo-deploy-dashboard/
 
 ### 3.1 Auth — conta, sessão e recuperação
 `config/users.js` + `routes/authRoutes.js`. Registro aberto só com base vazia (primeiro vira admin); depois, admin cria. Senha só em hash bcrypt; JWT 12h com versão (logout global derruba tudo). Recuperação: token 64 chars, 1h, uso único, guardado como SHA256; resposta idêntica exista ou não o e-mail. Login com Google opcional (`GOOGLE_CLIENT_ID`): ID token verificado no servidor, conta sem senha local.
+**2FA TOTP** (opcional por conta): segredo AES-GCM + QR no perfil, janela ±30s, 8 códigos reserva SHA256 de 1 uso. Login vira 2 passos (202 + `/2fa/verify`); senha vazada sozinha não entra. TOTP em `services/totp.js`, validado nos 3 vetores da RFC 6238.
 
 ### 3.2 Perfis — Netflix em casa
 `routes/profileRoutes.js`. 1 conta (login, quota, arquivos), N perfis (até 8) com PIN opcional em hash. Playlists podem pertencer a um perfil; apagar perfil devolve as pastas pra conta. Trocar de perfil não desloga.
@@ -109,7 +110,7 @@ contabo-deploy-dashboard/
 `routes/storageRoutes.js` + `services/fileGuard.js`. Upload 10GB (`MAX_UPLOAD_MB`), quota por conta (padrão 20GB), nome em disco = uuid, dono em tudo, 404 genérico pra inexistente/alheio/trancado. Download com `Range` (seek), executável como anexo, auditoria em `audit.json`.
 
 ### 3.5 Compressão — o espremedor
-`services/compressService.js`. Fila 1-por-vez: foto→WebP q70 + thumb (gif: só thumb), áudio→Opus 96k + capa do álbum + waveform 100pts, vídeo→thumb primeiro + H.264 720p/30fps (`ultrafast` >500MB) com % no meta. Se sair maior, mantém original. Falha nunca perde arquivo. Quota conta o final.
+`services/compressService.js`. Pool 2 workers (`COMPRESS_WORKERS`, menor-primeiro): foto→WebP q70 + thumb (gif: só thumb), áudio→Opus 96k + capa do álbum + waveform 100pts, vídeo→thumb primeiro + H.264 720p/30fps GOP 300 (`ultrafast` >500MB) com % no meta. Se sair maior, mantém original (`já-otimizado`). Falha nunca perde arquivo; boot reconcilia órfãos. Quota conta o final.
 
 ### 3.6 Busca — full-text
 `services/searchService.js` + `routes/searchRoutes.js`. Normaliza acento/caixa, AND entre termos, ranqueia nome > tipo/duração > corpo do PDF (extraído no worker + backfill, teto 100MB). Trechinho de contexto no card. Isolada por dono; cofre some; apagar limpa o índice.
@@ -126,8 +127,8 @@ contabo-deploy-dashboard/
 ### 3.10 Contabo + SSH — olhos na VPS
 `contaboService` (OAuth, instâncias, start/restart/stop, audits, snapshots) + `sshService` (`collectStats`: uptime, RAM, disco, docker, pm2, nginx). Credenciais AES-GCM, nunca em claro.
 
-### 3.11 Sistema — disco e admin
-`routes/systemRoutes.js` (disco real via statfs + alerta 70%) + overview em `authRoutes` (uso/quota/plano por usuário, troca de plano, exclusão com wipe total, último admin protegido).
+### 3.11 Sistema — disco, admin e backup
+`routes/systemRoutes.js` (disco real via statfs + alerta 70% + plano de ação + receita) + overview em `authRoutes` (uso/quota/plano por usuário, troca de plano, exclusão com wipe total, último admin protegido) + backup zip de `data/` (criar/listar/baixar/apagar; restaura deszipando parado).
 
 ### 3.12 E-mail — recuperação de senha
 `services/mailer.js`. Com SMTP envia de verdade; sem, o link vai pro log (dev). Link carrega `PUBLIC_URL`.
@@ -160,7 +161,7 @@ Delete move (`trashedAt`); some de lista/busca/download. Página própria com di
 
 ## Cap. 5 — Modelo de negócio (por que 20GB valem 200GB)
 
-A 90% de compressão, 20GB reais guardam ~200GB de originais (medido: 2.51GB→172MB). Vende-se quota lógica: Leve 100GB R$9,90 · Família 500GB R$29,90 · Studio 2TB R$79,90. Custo: VPS €5,50 + Object 250GB €2,49 quando o disco bater 70%. Teto saudável: volume no Família (~R$30, faixa psicológica), nunca preço alto.
+A 90% de compressão, 20GB reais guardam ~200GB de originais (medido: 2.51GB→172MB). Vende-se quota lógica: Leve 200GB R$14,90 · Plus 500GB R$19,90 (herói) · Studio 5TB R$79,90; anual com 2 meses grátis (149/199/799). Custo: VPS €5,50 + Object 250GB €2,49 quando o disco bater 70%. Teto saudável: volume no Plus (~R$20, faixa psicológica), nunca preço alto.
 
 ## Cap. 6 — Rodando local + variáveis de ambiente
 
@@ -176,4 +177,4 @@ Criação do cliente: https://console.cloud.google.com/auth/clients/create?organ
 
 ## Cap. 7 — Roadmap (o que falta)
 
-Pagamento (Pix + webhook→quota) · botão excluir conta · termos/LGPD · tier S3 · ghostscript p/ PDF · baixar playlist em zip · app nativo (Capacitor) + WebAuthn · upload fatiado no app mobile. Nada disso quebra o que existe.
+Pagamento (Pix + webhook→quota) · botão excluir conta · termos/LGPD · tier S3 (+2ª via H.265 fria) · ghostscript p/ PDF · baixar playlist em zip · app nativo (Capacitor) + WebAuthn · AVIF em fotos + denoise leve. Nada disso quebra o que existe.

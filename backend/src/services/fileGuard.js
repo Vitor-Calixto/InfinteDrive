@@ -73,7 +73,7 @@ export function assertOwner(meta, user) {
 export function quotaUsageMB(userId) {
   const bytes = readCollection('storage')
     .filter((m) => m.ownerId === userId)
-    .reduce((acc, m) => acc + (Number(m.sizeFinal) || 0), 0);
+    .reduce((acc, m) => acc + (Number(m.sizeFinal ?? m.sizeOrig) || 0), 0);
   return bytes / (1024 * 1024);
 }
 
@@ -84,6 +84,20 @@ export function assertQuota(userId, quotaMB, newBytes) {
     throw new Error('Quota esgotada.');
   }
   return { usedMB: used, quotaMB: quota };
+}
+
+// Trava ANTES de receber bytes: usa Content-Length pra recusar 402 sem
+// gastar banda/disco (o cheque final continua depois do upload).
+export function checkQuotaBefore(req, res, next) {
+  try {
+    const len = Number(req.headers['content-length']);
+    if (Number.isFinite(len) && len > 0 && req.user) {
+      assertQuota(req.user.id, req.user.quotaMB, len);
+    }
+    return next();
+  } catch (e) {
+    return res.status(402).json({ error: e.message });
+  }
 }
 
 // Auditoria local (offline): quem acessou qual arquivo e quando.

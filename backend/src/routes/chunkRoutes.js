@@ -19,12 +19,15 @@ r.use(requireAuth, fileLimiter);
 // 3) POST /complete { uploadId, name, mime, size } -> monta por stream
 //    direto no destino final (sem 2x transitório) e cria o meta.
 const CHUNK_DIR = path.join(process.cwd(), 'data', 'chunks');
-if (!fs.existsSync(CHUNK_DIR)) fs.mkdirSync(CHUNK_DIR, { recursive: true });
+function ensureChunkDir() {
+  if (!fs.existsSync(CHUNK_DIR)) fs.mkdirSync(CHUNK_DIR, { recursive: true });
+}
 const chunkUpload = createSecureUpload({ maxBytes: 16 * 1024 * 1024 });
 const MAX_BYTES = Number(process.env.MAX_UPLOAD_MB) > 0 ? Number(process.env.MAX_UPLOAD_MB) * 1024 * 1024 : 10 * 1024 * 1024 * 1024;
 
 const upDir = (uploadId) => {
   if (!/^[0-9a-f-]{36}$/.test(String(uploadId || ''))) throw new Error('uploadId inválido.');
+  ensureChunkDir();
   return path.join(CHUNK_DIR, String(uploadId));
 };
 

@@ -8,7 +8,7 @@ import { createSecureUpload } from '../middlewares/upload.js';
 import { sanitizeFilename } from '../middlewares/validate.js';
 import {
   userRoot, blobPath, getFileMeta, assertOwner,
-  assertQuota, quotaUsageMB, appendAudit,
+  assertQuota, quotaUsageMB, appendAudit, checkQuotaBefore,
 } from '../services/fileGuard.js';
 import { enqueueCompression } from '../services/compressService.js';
 import { dropIndex } from '../services/searchService.js';
@@ -40,7 +40,7 @@ function sha256File(absPath) {
 
 // POST /api/storage/upload (campo "file"). Auth + quota + hash SHA256.
 // Nome em disco = uuid, nunca o original. Resposta sem caminho real.
-r.post('/upload', upload.single('file'), async (req, res) => {
+r.post('/upload', checkQuotaBefore, upload.single('file'), async (req, res) => {
   let savedId = '';
   try {
     if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo.' });
@@ -78,8 +78,9 @@ r.post('/upload', upload.single('file'), async (req, res) => {
 });
 
 // GET /api/storage/list — só os MEUS arquivos (admin usa ?all=1, auditado).
-// Nunca expõe sha256: é dado interno de integridade, não precisa sair na lista.
-// Cofre trancado some daqui (só volta com unlock). Lixeira (?trashed=1) à parte.
+// Expõe o sha256 como `hash` (só dono/admin, que já podem baixar e calcular):
+// o front deduplica downloads por ele. Cofre trancado some daqui
+// (só volta com unlock). Lixeira (?trashed=1) à parte.
 r.get('/list', (req, res) => {
   const all = readCollection('storage');
   const trashedOnly = req.query.trashed === '1';
@@ -89,7 +90,9 @@ r.get('/list', (req, res) => {
   if (req.user.role === 'admin' && req.query.all === '1') {
     appendAudit({ userId: req.user.id, action: 'list-all', ip: req.ip });
   }
-  const pub = mine.map(({ sha256, ...rest }) => rest);
+  // hash exposto AO DONO como `hash`: ele já pode baixar e calcular,
+  // então nada novo vaza — e o front usa p/ deduplicar downloads.
+  const pub = mine.map(({ sha256, ...rest }) => ({ ...rest, hash: sha256 }));
   return res.json(pub.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))));
 });
 
@@ -118,6 +121,17 @@ r.get('/quota', (req, res) => {
     files: done.length,
     processing: { files: pending.length, origMB: pendB / (1024 * 1024) },
     trash: { files: trashed.length, mb: trashed.reduce((a, m) => a + (Number(m.sizeFinal ?? m.sizeOrig) || 0), 0) / (1024 * 1024) },
+    byKind: ['image', 'audio', 'video'].map((k) => {
+      const items = done.filter((m) => String(m.mime || '').startsWith(k + '/'));
+      const o = items.reduce((a, m) => a + (Number(m.sizeOrig) || 0), 0);
+      const f = items.reduce((a, m) => a + (Number(m.sizeFinal ?? m.sizeOrig) || 0), 0);
+      return { kind: k, files: items.length, origMB: o / (1024 * 1024), finalMB: f / (1024 * 1024) };
+    }).concat([(() => {
+      const items = done.filter((m) => !/^(image|audio|video)\//.test(String(m.mime || '')));
+      const o = items.reduce((a, m) => a + (Number(m.sizeOrig) || 0), 0);
+      const f = items.reduce((a, m) => a + (Number(m.sizeFinal ?? m.sizeOrig) || 0), 0);
+      return { kind: 'docs', files: items.length, origMB: o / (1024 * 1024), finalMB: f / (1024 * 1024) };
+    })()]),
   });
 });
 
@@ -135,12 +149,15 @@ r.get('/download/:id', (req, res) => {
   try { abs = blobPath(meta.ownerId, meta.id); } catch { return res.status(404).json({ error: 'Arquivo não encontrado.' }); }
   if (!fs.existsSync(abs)) return res.status(404).json({ error: 'Arquivo não encontrado.' });
   appendAudit({ userId: req.user.id, action: 'download', fileId: meta.id, ip: req.ip });
-  // Executável sempre como anexo: navegador baixa, nunca tenta rodar.
+  // Executável e HTML/JS/SVG sempre como anexo: navegador baixa, nunca
+  // interpreta (stored-XSS: virus.html com <script> não roda na nossa origem).
   const isBin = /\.(exe|msi)$/i.test(meta.name || '');
-  res.setHeader('Content-Type', meta.mime || 'application/octet-stream');
+  const isActive = /\.(html?|js|svg|xml|xhtml)$/i.test(meta.name || '');
+  const forceDl = isBin || isActive;
+  res.setHeader('Content-Type', isActive ? 'text/plain; charset=utf-8' : (meta.mime || 'application/octet-stream'));
   res.setHeader('Content-Length', String(meta.sizeFinal ?? meta.sizeOrig ?? fs.statSync(abs).size));
   res.setHeader('Accept-Ranges', 'bytes');
-  res.setHeader('Content-Disposition', `${isBin ? 'attachment' : 'inline'}; filename*=UTF-8''${encodeURIComponent(meta.name || 'arquivo')}`);
+  res.setHeader('Content-Disposition', `${forceDl ? 'attachment' : 'inline'}; filename*=UTF-8''${encodeURIComponent(meta.name || 'arquivo')}`);
   res.setHeader('X-Content-Type-Options', 'nosniff');
   return res.sendFile(abs, { dotfiles: 'deny' });
 });
@@ -175,6 +192,19 @@ r.delete('/:id', (req, res) => {
   return res.json({ ok: true, trashed: true });
 });
 
+// PATCH /api/storage/:id { name } — renomeia (só o rótulo; disco continua uuid).
+r.patch('/:id', (req, res) => {
+  const meta = assertOwner(getFileMeta(req.params.id), req.user);
+  if (!meta) return res.status(404).json({ error: 'Arquivo não encontrado.' });
+  const name = sanitizeFilename(String(req.body?.name || ''));
+  if (!name || name.length > 120) return res.status(400).json({ error: 'Nome inválido.' });
+  meta.name = name;
+  upsertRow('storage', meta);
+  appendAudit({ userId: req.user.id, action: 'rename', fileId: meta.id, ip: req.ip, detail: name });
+  const { sha256, ...pub } = meta;
+  return res.json(pub);
+});
+
 // POST /api/storage/:id/restore — volta da lixeira.
 r.post('/:id/restore', (req, res) => {
   const meta = assertOwner(getFileMeta(req.params.id), req.user);
@@ -183,6 +213,23 @@ r.post('/:id/restore', (req, res) => {
   delete meta.trashedAt;
   upsertRow('storage', meta);
   appendAudit({ userId: req.user.id, action: 'restore', fileId: meta.id, ip: req.ip, detail: meta.name });
+  return res.json({ ok: true });
+});
+
+// POST /api/storage/:id/recompress — roda o compressor de novo com as
+// configurações atuais (ex: CRF novo). Só vale p/ imagem/áudio/vídeo;
+// outros tipos voltam como "sem compressor" sem mudar o blob.
+r.post('/:id/recompress', (req, res) => {
+  const meta = assertOwner(getFileMeta(req.params.id), req.user);
+  if (!meta) return res.status(404).json({ error: 'Arquivo não encontrado.' });
+  if (meta.trashedAt) return res.status(400).json({ error: 'Restaure da lixeira antes.' });
+  meta.compressed = false;
+  delete meta.progress;
+  delete meta.note;
+  delete meta.compressError;
+  upsertRow('storage', meta);
+  enqueueCompression(meta.id);
+  appendAudit({ userId: req.user.id, action: 'recompress', fileId: meta.id, ip: req.ip, detail: meta.name });
   return res.json({ ok: true });
 });
 

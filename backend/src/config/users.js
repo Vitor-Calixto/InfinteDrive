@@ -1,4 +1,6 @@
 import bcrypt from 'bcryptjs';
+import { encryptSecret, decryptSecret } from './crypto.js';
+import { generateSecret, verifyTotp, otpauthUri, newBackupCodes, hashCode } from '../services/totp.js';
 import jwt from 'jsonwebtoken';
 import crypto from 'node:crypto';
 import { randomUUID } from 'node:crypto';
@@ -10,7 +12,7 @@ import { readCollection, upsertRow } from './store.js';
 // em crypto.js — hash é irreversível e não serviria para discar SSH.
 // Planos: a quota deriva do plano (Leve 100GB, Família 500GB, Studio 2TB).
 // Trocar o plano sem mexer na quota ajusta sozinho.
-export const PLAN_QUOTA = { Leve: 102400, 'Família': 512000, Studio: 2048000 };
+export const PLAN_QUOTA = { Leve: 204800, Plus: 512000, Studio: 5242880, 'Família': 1048576 };
 export function quotaFor(plan) {
   return PLAN_QUOTA[plan] || PLAN_QUOTA.Leve;
 }
@@ -47,7 +49,7 @@ export function hashPassword(password) {
 
 export function publicUser(u) {
   if (!u) return null;
-  const { passHash, ...pub } = u;
+  const { passHash, tfaSecretEnc, tfaBackup, resetHash, ...pub } = u;
   return pub;
 }
 
@@ -116,6 +118,63 @@ export function bumpTokenVersion(id) {
   if (!u) return;
   u.tokenVersion = (u.tokenVersion || 1) + 1;
   upsertRow('users', u);
+}
+
+// ---- 2FA TOTP (camada extra): segredo AES-GCM, códigos backup SHA256 1-uso ----
+export function tfaStatus(id) {
+  const u = findById(id);
+  return { enabled: !!(u && u.tfaEnabled) };
+}
+
+export function tfaSetupStart(id) {
+  const u = findById(id);
+  if (!u) throw new Error('Usuário não encontrado.');
+  if (!u.passHash) throw new Error('Conta Google: defina uma senha antes do 2FA.');
+  const secret = generateSecret();
+  u.tfaSecretEnc = encryptSecret(secret);
+  u.tfaEnabled = false;
+  upsertRow('users', u);
+  return { secret, uri: otpauthUri({ issuer: 'DecaVault', label: u.email, secret }) };
+}
+
+export function tfaEnable(id, token) {
+  const u = findById(id);
+  if (!u?.tfaSecretEnc) throw new Error('Inicie a configuração primeiro.');
+  const secret = decryptSecret(u.tfaSecretEnc);
+  if (!secret || !verifyTotp(secret, token)) throw new Error('Código inválido. Confira o relógio do celular.');
+  const codes = newBackupCodes();
+  u.tfaEnabled = true;
+  u.tfaBackup = codes.map(hashCode);
+  upsertRow('users', u);
+  return { codes }; // mostra UMA vez
+}
+
+export function tfaCheck(user, token) {
+  const u = typeof user === 'string' ? findByEmail(user) : user;
+  if (!u?.tfaEnabled) return true; // sem 2FA, senha basta
+  const t = String(token || '').trim();
+  const secret = decryptSecret(u.tfaSecretEnc || '');
+  if (secret && verifyTotp(secret, t)) return true;
+  const h = hashCode(t.toUpperCase());
+  const i = (u.tfaBackup || []).indexOf(h);
+  if (i >= 0) { // backup code: 1 uso
+    u.tfaBackup.splice(i, 1);
+    upsertRow('users', u);
+    return true;
+  }
+  return false;
+}
+
+export function tfaDisable(id, password) {
+  const u = findById(id);
+  if (!u) throw new Error('Usuário não encontrado.');
+  if (!verifyUser(u.email, password)) throw new Error('Senha incorreta.');
+  delete u.tfaSecretEnc;
+  delete u.tfaBackup;
+  u.tfaEnabled = false;
+  u.tokenVersion = (u.tokenVersion || 1) + 1;
+  upsertRow('users', u);
+  return true;
 }
 
 export function setPassword(id, newPassword) {

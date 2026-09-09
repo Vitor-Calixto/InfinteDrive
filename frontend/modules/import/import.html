@@ -1,0 +1,12 @@
+<h1 class="sp-greet">Trazer do Google 📥</h1>
+<p class="hint">Puxa tudo do Drive e do Google Fotos de uma vez, sem selecionar. Pede permissão só na hora.</p>
+<div class="flex gap-2">
+  <button onclick="ImportMod.from('drive')" class="btn">Importar Drive</button>
+  <button onclick="ImportMod.from('photos')" class="btn-ghost">Importar Fotos</button>
+</div>
+<div id="impStatus" class="text-xs mt-2 text-zinc-400"></div>
+<div id="impBar" class="sp-progress" hidden><div id="impFill"></div></div>
+<div class="card mt-4">
+  <h2 class="card-title">Como funciona</h2>
+  <p class="hint">1) Google pede sua permissão (só leitura). 2) Trazemos em lote com barra de progresso. 3) Tudo entra na compressão e nas playlists sozinho.</p>
+</div>

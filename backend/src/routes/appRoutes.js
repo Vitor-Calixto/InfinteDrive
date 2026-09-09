@@ -13,12 +13,12 @@ import { assertGithubUrl, assertPort, assertDomain, sanitizeLabel } from '../mid
 const r = Router();
 const zipUpload = createSecureUpload({ maxBytes: 500 * 1024 * 1024 });
 const ZIP_DIR = path.join(process.cwd(), 'data', 'tmp-zip');
-if (!fs.existsSync(ZIP_DIR)) fs.mkdirSync(ZIP_DIR, { recursive: true });
 
 // POST /api/apps/upload-zip (campo "file"): recebe o .zip da máquina,
 // valida entradas e devolve { zipId } para usar no deploy.
 r.post('/upload-zip', fileLimiter, zipUpload.single('file'), async (req, res) => {
   try {
+    if (!fs.existsSync(ZIP_DIR)) fs.mkdirSync(ZIP_DIR, { recursive: true });
     if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo.' });
     if (!/\.zip$/i.test(req.file.originalname || '')) {
       fs.unlinkSync(req.file.path);

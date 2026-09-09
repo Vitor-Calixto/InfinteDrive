@@ -1,0 +1,36 @@
+<h1 class="sp-greet">Planos 💎</h1>
+<p class="hint">Você paga pela quota. A compressão multiplica: vídeo rende ~10x, foto ~3x, misto ~5x.</p>
+<div id="myPlanLine" class="plan-me"></div>
+<div class="plan-grid">
+  <div class="plan-card">
+    <div class="plan-name">Leve</div>
+    <div class="plan-price">R$ 14,90<span>/mês</span></div>
+    <div class="plan-quota">200 GB</div>
+    <div class="text-xs text-zinc-400">≈ 1 TB em vídeo · 300 GB+ no misto</div>
+    <ul class="plan-list"><li>Player + playlists</li><li>1 playlist compartilhada</li><li>Suporte por e-mail</li></ul>
+    <button class="btn-ghost" onclick="Planos.choose('Leve')">Assinar</button>
+  </div>
+  <div class="plan-card hot">
+    <div class="plan-tag">MAIS POPULAR</div>
+    <div class="plan-name">Plus</div>
+    <div class="plan-price">R$ 19,90<span>/mês</span></div>
+    <div class="plan-quota">500 GB</div>
+    <div class="text-xs text-zinc-400">≈ 2,5 TB em vídeo</div>
+    <ul class="plan-list"><li>Tudo do Leve</li><li>5 perfis na conta</li><li>Pastas compartilhadas</li><li>Suporte prioritário</li></ul>
+    <button class="btn" onclick="Planos.choose('Plus')">Assinar</button>
+  </div>
+  <div class="plan-card">
+    <div class="plan-name">Studio</div>
+    <div class="plan-price">R$ 79,90<span>/mês</span></div>
+    <div class="plan-quota">5 TB</div>
+    <div class="text-xs text-zinc-400">≈ 25 TB de conteúdo fora</div>
+    <ul class="plan-list"><li>Tudo do Plus</li><li>Domínio próprio</li><li>Suporte VIP</li></ul>
+    <button class="btn-ghost" onclick="Planos.choose('Studio')">Assinar</button>
+  </div>
+</div>
+<div class="card mt-4">
+  <h2 class="card-title">Quanto cabe pra você?</h2>
+  <p class="hint">Arraste: quantos GB de fotos e vídeos você tem hoje fora do app?</p>
+  <input id="calcGB" type="range" min="10" max="3000" value="200" step="10" oninput="Planos.calc()" class="sp-range" />
+  <div class="text-sm"><b id="calcIn">200 GB</b> fora → ocupa ≈ <b id="calcOut">40 GB</b> aqui <span id="calcPlan" class="plan-pill"></span></div>
+</div>

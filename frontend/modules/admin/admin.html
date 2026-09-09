@@ -1,0 +1,41 @@
+<h1 class="sp-greet">Admin ⚙</h1>
+<div class="card">
+  <h2 class="card-title">Disco — quando comprar mais</h2>
+  <p class="hint">Acima de 70% é hora do Object Storage. Atualiza sozinho ao abrir esta aba.</p>
+  <div class="flex justify-between text-xs text-zinc-400"><span id="dUseLabel">–</span><span id="dTotalLabel">–</span></div>
+  <div class="sp-bar big"><div id="dBar" style="width:0%"></div></div>
+  <div id="dAlert" class="text-xs mt-2" style="color:#f87171"></div>
+  <div id="dApp" class="text-xs mt-1 text-zinc-400"></div>
+  <div id="dPlan" class="text-xs mt-2 text-zinc-300" hidden>
+    <b>Plano de ação (70%+):</b> 1) Contabo → Object Storage 250GB (€2,49).
+    2) Cria bucket + access key. 3) Preenche S3_* no .env, reinicia.
+    4) O tier leva o frio sozinho. <span id="dMoney"></span>
+  </div>
+</div>
+<div class="card mt-4" id="adminCard">
+  <div class="flex justify-between items-center">
+    <h2 class="card-title">Usuários — memória e planos</h2>
+    <button onclick="Admin.refreshUsers()" class="btn-ghost">Atualizar</button>
+  </div>
+  <div class="card mt-2" style="background:#1b1b1b">
+    <h3 class="text-sm font-semibold">＋ Nova conta</h3>
+    <div class="grid grid-cols-2 gap-2 mt-2">
+      <input id="nu_name" class="inp" placeholder="Nome" />
+      <input id="nu_email" class="inp" placeholder="E-mail" />
+      <input id="nu_pass" class="inp" type="password" placeholder="Senha (8+)" />
+      <select id="nu_plan" class="inp"><option>Leve</option><option>Plus</option><option>Studio</option></select>
+    </div>
+    <button onclick="Admin.createUser()" class="btn mt-2">Criar conta</button>
+    <div id="nu_state" class="text-xs mt-2 text-zinc-400"></div>
+  </div>
+  <div id="usersBox" class="space-y-2 text-sm mt-2"></div>
+</div>
+<div class="card mt-4">
+  <div class="flex justify-between items-center">
+    <h2 class="card-title">Backup — zip de tudo</h2>
+    <button onclick="Admin.makeBackup()" class="btn">Fazer backup agora</button>
+  </div>
+  <p class="hint">Inclui contas, arquivos e playlists. Restaurar = deszipar em backend/data/ com o backend parado.</p>
+  <div id="backupState" class="text-xs mt-1 text-zinc-400"></div>
+  <div id="backupBox" class="space-y-1 text-sm mt-2"></div>
+</div>

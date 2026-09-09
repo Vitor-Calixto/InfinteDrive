@@ -112,4 +112,12 @@ ensureAdminBootstrap();
 startWorker(); // fila de compressão (imagens) em background
 try { purgeTrash(); } catch {} // faxina da lixeira 30d no boot
 setInterval(() => { try { purgeTrash(); } catch {} }, 6 * 60 * 60 * 1000);
-app.listen(PORT, () => console.log(`🚀 deploy-dashboard backend :${PORT} -> /api/health`));
+import('node:os').then((os) => {
+  const nets = Object.values(os.networkInterfaces()).flat().filter((n) => n && n.family === 'IPv4' && !n.internal);
+  const lan = nets.map((n) => n.address)[0] || 'SEU-IP';
+  app.listen(PORT, () => {
+    console.log(`🚀 deploy-dashboard backend :${PORT} -> /api/health`);
+    console.log(`🖥 painel local:  http://localhost:${PORT}/`);
+    console.log(`📱 mesma Wi-Fi:   http://${lan}:${PORT}/`);
+  });
+});

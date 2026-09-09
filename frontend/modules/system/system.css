@@ -1,0 +1,11 @@
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.stat-card{background:linear-gradient(160deg,#1c1c1c,#141414);border:1px solid #2a2a2a;border-radius:14px;padding:14px;text-align:center}
+.stat-card.hot{border-color:rgba(29,185,84,.5)}
+.stat-card.green{border-color:rgba(29,185,84,.35)}
+.stat-label{color:#b3b3b3;font-size:12px}
+.stat-val{font-weight:800;font-size:21px;margin-top:2px}
+.stat-card.green .stat-val{color:var(--sp-green)}
+.stat-hint{color:#71717a;font-size:11px;margin-top:2px}
+.kind-list{display:flex;flex-direction:column;gap:10px;margin-top:6px}
+.kind-row{background:#141414;border:1px solid #262626;border-radius:10px;padding:10px 12px}
+@media(max-width:700px){.stat-grid{grid-template-columns:repeat(2,1fr)}}

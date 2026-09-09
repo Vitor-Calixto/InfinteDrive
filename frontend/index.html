@@ -1,285 +1,188 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="theme-color" content="#121212" />
-<link rel="manifest" href="manifest.json" />
-<link rel="apple-touch-icon" href="icons/icon-192.png" />
-<title>Deploy Center — Drive Spotify</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%231DB954'/%3E%3C/svg%3E" />
-<link rel="stylesheet" href="css/style.css" />
+  <script>
+    // Mata Service Workers fósseis (do projeto antigo) que servem HTML velho sem falar com o servidor.
+    if ('serviceWorker' in navigator) { navigator.serviceWorker.getRegistrations().then(function (rs) { rs.forEach(function (r) { r.unregister(); }); }).catch(function () {}); }
+  </script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#000000" />
+  <title>Deploy Center — Drive Spotify</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%231DB954'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
-<!-- ============ AUTH (tela cheia, antes de entrar) ============ -->
-<div id="authScreen" class="sp-authscreen" hidden>
-  <div class="sp-authcard">
-    <div class="sp-logo big"><span class="sp-logo-dot"></span> Deploy Center</div>
-    <p class="hint">Seu Drive Spotify + deploy. Entre para continuar.</p>
-    <div id="authLogin">
-      <input id="u_email" class="inp" placeholder="E-mail" />
-      <input id="u_pass" class="inp" type="password" placeholder="Senha" />
-      <button onclick="login()" class="btn-big">Entrar</button>
-      <div id="googleWrap" hidden>
-        <div class="sp-div">ou</div>
-        <div id="googleBtn"></div>
+  <!-- AUTH -->
+  <div id="authScreen" class="sp-authscreen" hidden>
+    <div class="sp-authcard">
+      <div class="sp-logo big"><span class="sp-logo-dot"></span> Deploy Center</div>
+      <div id="authLogin">
+        <input id="u_email" class="inp" placeholder="E-mail" autocomplete="email" />
+        <input id="u_pass" class="inp" type="password" placeholder="Senha" autocomplete="current-password" />
+        <button onclick="Auth.login()" class="btn-big">Entrar</button>
+        <div class="flex gap-2 mt-2 text-xs"><span class="text-zinc-500">ou</span></div>
+        <div id="googleWrap" class="mt-2"><div id="googleBtn"></div></div>
+        <div class="flex gap-2 mt-2 text-xs">
+          <button onclick="Auth.show('register')" class="sp-link">Criar conta</button>
+          <button onclick="Auth.show('forgot')" class="sp-link">Esqueci a senha</button>
+        </div>
       </div>
-      <div class="flex gap-2 mt-2 text-xs">
-        <button onclick="showAuth('register')" class="sp-link">Criar conta</button>
-        <button onclick="showAuth('forgot')" class="sp-link">Esqueci a senha</button>
+      <div id="authRegister" hidden>
+        <input id="u_name" class="inp" placeholder="Nome" />
+        <input id="r_email" class="inp" placeholder="E-mail" />
+        <input id="r_pass" class="inp" type="password" placeholder="Senha (8+ caracteres)" />
+        <button onclick="Auth.register()" class="btn-big">Cadastrar</button>
+        <div class="mt-2 text-xs"><button onclick="Auth.show('login')" class="sp-link">Voltar ao login</button></div>
       </div>
-    </div>
-    <div id="authRegister" hidden>
-      <input id="u_name" class="inp" placeholder="Nome" />
-      <input id="r_email" class="inp" placeholder="E-mail" />
-      <input id="r_pass" class="inp" type="password" placeholder="Senha (8+ caracteres)" />
-      <button onclick="registerFirst()" class="btn-big">Cadastrar</button>
-      <div class="mt-2 text-xs"><button onclick="showAuth('login')" class="sp-link">Voltar ao login</button></div>
-    </div>
-    <div id="authForgot" hidden>
-      <input id="f_email" class="inp" placeholder="Seu e-mail" />
-      <button onclick="forgot()" class="btn-big">Enviar link</button>
-      <div class="mt-2 text-xs"><button onclick="showAuth('login')" class="sp-link">Voltar ao login</button></div>
-      <div id="forgotState" class="text-xs mt-2 text-zinc-400"></div>
-    </div>
-    <div id="authReset" hidden>
-      <input id="n_pass" class="inp" type="password" placeholder="Nova senha (8+ caracteres)" />
-      <button onclick="resetPass()" class="btn-big">Salvar nova senha</button>
+      <div id="authForgot" hidden>
+        <input id="f_email" class="inp" placeholder="Seu e-mail" />
+        <button onclick="Auth.forgot()" class="btn-big">Enviar link</button>
+        <div class="mt-2 text-xs"><button onclick="Auth.show('login')" class="sp-link">Voltar ao login</button></div>
+        <div id="forgotState" class="text-xs mt-2 text-zinc-400"></div>
+      </div>
+      <div id="auth2fa" hidden>
+        <p class="hint">Código de 6 dígitos do app autenticador (ou um código reserva).</p>
+        <input id="tfa_code" class="inp" inputmode="numeric" maxlength="12" placeholder="123456" autocomplete="one-time-code" />
+        <button onclick="Auth.verify2fa()" class="btn-big">Verificar</button>
+        <div class="mt-2 text-xs"><button onclick="Auth.show('login')" class="sp-link">Voltar</button></div>
+      </div>
     </div>
   </div>
-</div>
-<div class="sp-shell" id="appShell">
-  <!-- ============ SIDEBAR ============ -->
-  <aside class="sp-side">
-    <div class="sp-logo"><span class="sp-logo-dot"></span> Deploy Center</div>
-    <div id="profRow" class="sp-profs"></div>
-    <nav class="sp-nav">
-      <button class="sp-nav-btn active" data-view="drive" onclick="showView('drive')">🏠 Início</button>
-      <button class="sp-nav-btn" data-view="planos" onclick="showView('planos')">💎 Planos</button>
-      <button class="sp-nav-btn" data-view="system" id="navAdmin" onclick="showView('system')" hidden>⚙ Admin</button>
-    </nav>
-    <div class="sp-lib-title">Suas playlists</div>
-    <nav class="sp-nav" id="kindNav">
-      <button class="sp-nav-btn" data-kind="all" onclick="filterKind('all')">🎵 Todas</button>
-      <button class="sp-nav-btn" data-kind="image" onclick="filterKind('image')">🖼 Fotos</button>
-      <button class="sp-nav-btn" data-kind="audio" onclick="filterKind('audio')">🎧 Músicas</button>
-      <button class="sp-nav-btn" data-kind="video" onclick="filterKind('video')">🎬 Vídeos</button>
-    </nav>
-    <nav class="sp-nav" id="playNav"></nav>
-    <button class="sp-nav-btn" onclick="createPlaylist()">＋ Nova playlist</button>
-    <button class="sp-nav-btn" data-view="trash" onclick="showView('trash')">🗑 Lixeira</button>
-    <div class="sp-side-foot">
-      <div class="sp-quota-mini">
-        <div class="flex justify-between text-xs text-zinc-400"><span>Espaço</span><span id="qUseMini">–</span></div>
-        <div class="sp-bar"><div id="qBarMini" style="width:0%"></div></div>
+
+  <!-- SHELL -->
+  <div class="sp-shell" id="appShell">
+    <!-- Aba fina na borda esquerda: aparece só com a barra escondida, 1 clique traz de volta -->
+    <button id="sideReopen" onclick="Shell.toggleSidebar(event)" title="Mostrar biblioteca">›</button>
+    <!-- SIDEBAR ÚNICA. Só existe esta. Nenhum outro painel lateral fullscreen. -->
+    <aside id="sidebar" class="sp-side" aria-label="Biblioteca">
+      <!-- HAMBURGER DENTRO DA BARRA: visível sempre com ela aberta; fechada usa a aba › -->
+      <button id="navToggle" class="sp-navtoggle" onclick="Shell.toggleSidebar(event)" title="Biblioteca — abrir / recolher" aria-label="Abrir ou recolher biblioteca"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="2" y1="4" x2="16" y2="4"/><line x1="2" y1="9" x2="16" y2="9"/><line x1="2" y1="14" x2="16" y2="14"/></svg></button>
+      <div class="sp-side-card nav-card">
+        <div class="sp-logo"><span class="sp-logo-dot"></span> <span class="side-label">Deploy Center</span></div>
+        <nav class="sp-nav">
+          <button class="sp-nav-btn active" data-view="drive" onclick="Shell.show('drive')">🏠 <span class="side-label">Início</span></button>
+          <button class="sp-nav-btn" onclick="Search.focus()"><span class="nav-icon">🔍</span> <span class="side-label">Buscar</span></button>
+        </nav>
       </div>
-      <div class="sp-auth">
-        <!-- perfil (visível só logado; login/cadastro/esqueci ficam na tela cheia) -->
-        <div id="authProfile" hidden>
-          <div id="profileBox" class="text-xs text-zinc-300"></div>
-          <input id="c_cur" class="inp mt-2" type="password" placeholder="Senha atual" />
-          <input id="c_new" class="inp" type="password" placeholder="Nova senha" />
-          <div class="flex gap-2">
-            <button onclick="changePass()" class="btn-ghost">Trocar senha</button>
-            <button onclick="logout()" class="btn-ghost">Sair</button>
+      <div class="sp-side-card lib-card">
+        <div class="sp-lib-header">
+          <div class="sp-lib-title">📚 <span class="side-label">Sua Biblioteca</span></div>
+          <button class="sp-icon-btn" onclick="Shell.toggleCriar(event)" title="Criar">＋</button>
+        </div>
+        <div id="criarMenu" class="sp-menu" hidden>
+          <button onclick="Playlists.create()">📁 Nova playlist</button>
+          <button onclick="Profiles.create()">👤 Novo perfil</button>
+          <button onclick="Upload.pick()">⬆ Enviar arquivo</button>
+        </div>
+        <nav class="sp-pills-nav" id="kindNav">
+          <button class="sp-pill active" data-kind="all" onclick="Drive.filterKind('all')">Todas</button>
+          <button class="sp-pill" data-kind="image" onclick="Drive.filterKind('image')">🖼 Fotos</button>
+          <button class="sp-pill" data-kind="audio" onclick="Drive.filterKind('audio')">🎧 Músicas</button>
+          <button class="sp-pill" data-kind="video" onclick="Drive.filterKind('video')">🎬 Vídeos</button>
+        </nav>
+        <div class="sp-lib-scroll">
+          <nav class="sp-nav" id="playNav"></nav>
+          <div class="sp-menu-sep"></div>
+          <nav class="sp-nav" id="systemNav">
+            <button class="sp-nav-btn" data-view="system" onclick="Shell.show('system')">📊 <span class="side-label">Uso</span></button>
+            <button class="sp-nav-btn" data-view="planos" onclick="Shell.show('planos')">💎 <span class="side-label">Planos</span></button>
+            <button class="sp-nav-btn" data-view="import" onclick="Shell.show('import')">📥 <span class="side-label">Importar</span></button>
+            <button class="sp-nav-btn" data-view="trash" onclick="Shell.show('trash')">🗑 <span class="side-label">Lixeira</span></button>
+            <button class="sp-nav-btn" data-view="vault" onclick="Shell.show('vault')">🔒 <span class="side-label">Cofre</span></button>
+            <button class="sp-nav-btn" data-view="admin" onclick="Shell.show('admin')">⚙ <span class="side-label">Admin</span></button>
+          </nav>
+        </div>
+        <div class="sp-side-foot">
+          <div class="sp-quota-mini">
+            <div class="flex justify-between text-xs text-zinc-400"><span>Espaço</span><span id="qUseMini">–</span></div>
+            <div class="sp-bar"><div id="qBarMini" style="width:0%"></div></div>
           </div>
+          <div class="sp-foot-row">
+            <button class="sp-foot-btn" onclick="Shell.show('system')" title="Minha conta e uso">⚙ Conta</button>
+            <button class="sp-foot-btn" onclick="Shell.show('planos')" title="Ver planos">💎 Planos</button>
+            <button class="sp-foot-btn" onclick="Auth.logout()" title="Sair">↩ Sair</button>
+          </div>
+          <div class="sp-ver">Deploy Center v10</div>
         </div>
-        <div id="authState" class="text-xs mt-2 text-zinc-400" hidden>Deslogado.</div>
       </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="sp-main" id="main">
+      <header class="sp-topbar">
+        <div class="sp-topbar-left">
+          <input id="search" class="sp-search" placeholder="O que você quer ouvir ou buscar? 🔍" oninput="Search.onInput(this.value)" />
+        </div>
+      </header>
+      <div id="viewHost"></div>
+    </main>
+  </div>
+
+  <nav id="mobileNav">
+    <button class="sp-nav-btn active" data-view="drive" onclick="Shell.show('drive')">🏠<span>Início</span></button>
+    <button class="sp-nav-btn" data-view="system" onclick="Shell.show('system')">📊<span>Uso</span></button>
+    <button class="sp-nav-btn" data-view="planos" onclick="Shell.show('planos')">💎<span>Planos</span></button>
+    <button class="sp-nav-btn" data-view="import" onclick="Shell.show('import')">📥<span>Trazer</span></button>
+    <button class="sp-nav-btn" data-view="trash" onclick="Shell.show('trash')">🗑<span>Lixeira</span></button>
+  </nav>
+
+  <footer id="player" class="sp-player" hidden>
+    <div class="sp-player-left">
+      <img id="pCover" class="sp-p-cover" alt="" />
+      <div class="sp-p-meta"><div id="pTitle" class="sp-p-title">–</div><div id="pSub" class="sp-p-sub">–</div></div>
     </div>
-  </aside>
-
-  <!-- ============ MAIN ============ -->
-  <main class="sp-main">
-    <header class="sp-topbar">
-      <input id="search" class="sp-search" placeholder="O que você quer ouvir? 🔍" oninput="filterSearch(this.value)" />
-      <div class="flex gap-2 items-center">
-        <input id="apiBase" class="sp-api" value="http://localhost:4000/api" title="URL da API" />
-        <span id="health" class="text-xs text-zinc-400">●</span>
+    <div class="sp-player-center">
+      <div class="sp-p-btns">
+        <button onclick="Player.prev()" title="Anterior">⏮</button>
+        <button id="pToggle" onclick="Player.toggle()" class="sp-play-btn" title="Play/Pause">⏸</button>
+        <button onclick="Player.next()" title="Próxima">⏭</button>
       </div>
-    </header>
+      <audio id="audio" class="sp-p-audio" controls preload="metadata"></audio>
+    </div>
+    <div class="sp-player-right"><button onclick="Player.close()" class="sp-p-close" title="Fechar">✕</button></div>
+  </footer>
 
-    <!-- VIEW: DRIVE -->
-    <section id="view-drive">
-      <h1 class="sp-greet">Boa tarde ☀</h1>
-      <div class="sp-stats">
-        <div class="sp-stat"><div class="sp-stat-label">Guardado</div><div id="qOrig" class="sp-stat-val">–</div></div>
-        <div class="sp-stat"><div class="sp-stat-label">Ocupando</div><div id="qFinal" class="sp-stat-val">–</div></div>
-        <div class="sp-stat"><div class="sp-stat-label">Economizado</div><div id="qSaved" class="sp-stat-val green">–</div></div>
-        <div class="sp-stat"><div class="sp-stat-label">Arquivos</div><div id="qFiles" class="sp-stat-val">–</div></div>
-      </div>
-      <div class="mt-2">
-        <div class="flex justify-between text-xs text-zinc-400"><span id="qUseLabel">–</span><span id="qQuotaLabel">–</span></div>
-        <div class="sp-bar big"><div id="qBar" style="width:0%"></div></div>
-      </div>
-
-      <div id="dropzone" class="sp-drop">
-        Arraste foto, música ou vídeo aqui — ou <label class="sp-link">clique para escolher<input id="filePick" type="file" multiple class="hidden" /></label>
-      </div>
-      <div id="upStatus" class="text-xs mt-2 text-zinc-400"></div>
-    <div class="mt-1"><button id="retryBtn" class="btn-ghost" hidden onclick="retryFailed()">↻ Repetir falhas</button></div>
-    <div id="upBar" class="sp-progress" hidden><div id="upFill"></div></div>
-      <div class="card mt-4">
-        <h2 class="card-title">Trazer do Google 📥</h2>
-        <p class="hint">Puxa tudo do Drive e do Google Fotos de uma vez, sem selecionar. Pede permissão só na hora.</p>
-        <div class="flex gap-2">
-          <button onclick="googleImport('drive')" class="btn-ghost">Importar Drive</button>
-          <button onclick="googleImport('photos')" class="btn-ghost">Importar Fotos</button>
-        </div>
-        <div id="impStatus" class="text-xs mt-2 text-zinc-400"></div>
-        <div id="impBar" class="sp-progress" hidden><div id="impFill"></div></div>
-      </div>
-
-      <div class="flex justify-between items-center mt-5 mb-2">
-        <h2 class="sp-h2">Seus arquivos</h2>
-        <div class="flex gap-2">
-          <select id="sortSel" class="inp" style="width:auto;margin:0" onchange="setSort(this.value)">
-            <option value="recent">Mais recentes</option>
-            <option value="oldest">Mais antigos</option>
-            <option value="az">Nome A–Z</option>
-            <option value="za">Nome Z–A</option>
-            <option value="biggest">Maiores</option>
-            <option value="smallest">Menores</option>
-          </select>
-          <button onclick="addVisibleToPlaylist()" class="btn-ghost">＋ visíveis na playlist</button>
-          <button onclick="refreshFiles();refreshQuota()" class="btn-ghost">Atualizar</button>
-        </div>
-      </div>
-      <div id="filesGrid" class="sp-grid"><span class="text-zinc-500 text-xs">Entre no acesso local para ver seus arquivos.</span></div>
-    </section>
-
-    <!-- VIEW: LIXEIRA -->
-    <section id="view-trash" hidden>
-      <h1 class="sp-greet">Lixeira 🗑</h1>
-      <p class="hint">Apaga sozinho em 30 dias. <span id="trashCount" class="text-zinc-400"></span></p>
-      <button onclick="emptyTrash()" class="btn-ghost">Esvaziar tudo</button>
-      <div id="trashGrid" class="sp-grid mt-2"></div>
-    </section>
-
-    <!-- VIEW: PLANOS -->
-    <section id="view-planos" hidden>
-      <h1 class="sp-greet">Planos 💎</h1>
-      <p class="hint">Você paga pela quota. A compressão multiplica: vídeo rende ~10x, foto ~3x, misto ~5x.</p>
-      <div id="myPlanLine" class="text-sm mb-3"></div>
-      <div class="sp-plans">
-        <div class="sp-plan">
-          <div class="sp-plan-name">Leve</div>
-          <div class="sp-plan-price">R$ 9,90<span>/mês</span></div>
-          <div class="sp-plan-quota">100 GB</div>
-          <div class="text-xs text-zinc-400">≈ 500 GB de fotos e vídeos fora</div>
-          <ul class="sp-plan-list"><li>Player + playlists</li><li>1 playlist compartilhada</li><li>Suporte por e-mail</li></ul>
-          <button class="btn-ghost" onclick="choosePlan('Leve')">Assinar</button>
-        </div>
-        <div class="sp-plan hot">
-          <div class="sp-plan-tag">MAIS POPULAR</div>
-          <div class="sp-plan-name">Família</div>
-          <div class="sp-plan-price">R$ 29,90<span>/mês</span></div>
-          <div class="sp-plan-quota">500 GB</div>
-          <div class="text-xs text-zinc-400">≈ 2.5 TB de fotos e vídeos fora</div>
-          <ul class="sp-plan-list"><li>Tudo do Leve</li><li>5 perfis na conta</li><li>Pastas compartilhadas</li><li>Suporte prioritário</li></ul>
-          <button class="btn" onclick="choosePlan('Família')">Assinar</button>
-        </div>
-        <div class="sp-plan">
-          <div class="sp-plan-name">Studio</div>
-          <div class="sp-plan-price">R$ 79,90<span>/mês</span></div>
-          <div class="sp-plan-quota">2 TB</div>
-          <div class="text-xs text-zinc-400">≈ 10 TB de conteúdo fora</div>
-          <ul class="sp-plan-list"><li>Tudo do Família</li><li>Domínio próprio</li><li>Suporte VIP</li><li>Acesso antecipado</li></ul>
-          <button class="btn-ghost" onclick="choosePlan('Studio')">Assinar</button>
-        </div>
-      </div>
-      <div class="card mt-4">
-        <h2 class="card-title">Quanto cabe pra você?</h2>
-        <p class="hint">Arraste: quantos GB de fotos e vídeos você tem hoje fora do app?</p>
-        <input id="calcGB" type="range" min="10" max="3000" value="200" step="10" oninput="calcPlan()" class="sp-range" />
-        <div class="text-sm"><b id="calcIn">200 GB</b> fora → ocupa ≈ <b id="calcOut">40 GB</b> aqui <span id="calcPlan" class="sp-plan-pill"></span></div>
-      </div>
-    </section>
-
-    <!-- VIEW: SISTEMA (admin: disco + usuários. Deploy/SSH/Cloudflare removidos do produto) -->
-    <section id="view-system" hidden>
-      <h1 class="sp-greet">Admin ⚙</h1>
-      <div class="card">
-        <h2 class="card-title">Disco — quando comprar mais</h2>
-        <p class="hint">Acima de 70% é hora do Object Storage. Atualiza sozinho ao abrir esta aba.</p>
-        <div class="flex justify-between text-xs text-zinc-400"><span id="dUseLabel">–</span><span id="dTotalLabel">–</span></div>
-        <div class="sp-bar big"><div id="dBar" style="width:0%"></div></div>
-        <div id="dAlert" class="text-xs mt-2" style="color:#f87171"></div>
-        <div id="dApp" class="text-xs mt-1 text-zinc-400"></div>
-      </div>
-      <div class="card mt-4" id="adminCard" hidden>
-        <div class="flex justify-between items-center">
-          <h2 class="card-title">Usuários — memória e planos</h2>
-          <button onclick="refreshUsers()" class="btn-ghost">Atualizar</button>
-        </div>
-        <div id="usersBox" class="space-y-2 text-sm mt-2"></div>
-      </div>
-    </section>
-  </main>
-</div>
-
-<!-- ============ NAV MOBILE ============ -->
-<nav id="mobileNav">
-  <button class="sp-nav-btn active" data-view="drive" onclick="showView('drive')">🏠<span>Início</span></button>
-  <button class="sp-nav-btn" data-view="planos" onclick="showView('planos')">💎<span>Planos</span></button>
-  <button class="sp-nav-btn" data-view="trash" onclick="showView('trash')">🗑<span>Lixeira</span></button>
-  <button class="sp-nav-btn" data-view="system" id="mAdmin" onclick="showView('system')" hidden>⚙<span>Admin</span></button>
-</nav>
-
-<!-- ============ PLAYER ============ -->
-<footer id="player" class="sp-player" hidden>
-  <img id="pCover" class="sp-p-cover" alt="" />
-  <div class="sp-p-meta"><div id="pTitle" class="sp-p-title">–</div><div id="pSub" class="sp-p-sub">–</div></div>
-  <div class="sp-p-btns">
-    <button onclick="playPrev()" title="Anterior">⏮</button>
-    <button id="pToggle" onclick="togglePlay()" title="Play/Pause">⏸</button>
-    <button onclick="playNext()" title="Próxima">⏭</button>
-  </div>
-  <audio id="audio" class="sp-p-audio" controls preload="metadata"></audio>
-  <button onclick="closePlayer()" class="sp-p-close" title="Fechar">✕</button>
-</footer>
-
-<!-- ============ MODAL (foto/vídeo) ============ -->
-<div id="modal" class="sp-modal" hidden onclick="if(event.target===this)closeModal()">
-  <button class="sp-modal-x" onclick="closeModal()">✕</button>
-  <div id="modalBody" class="sp-modal-body"></div>
-  <div id="modalCap" class="sp-modal-cap"></div>
-  <div id="shareRow" class="sp-share-row">
-    <span class="text-xs text-zinc-400">Compartilhar:</span>
-    <button class="btn-ghost" onclick="shareVia('wa')">WhatsApp</button>
-    <button class="btn-ghost" onclick="shareVia('mail')">E-mail</button>
-    <button class="btn-ghost" onclick="shareVia('gmail')">Gmail</button>
-    <button class="btn-ghost" onclick="shareVia('copy')">Copiar link</button>
-    <button class="btn-ghost" onclick="shareVia('native')">⋯ Mais</button>
-  </div>
-</div>
-
-<!-- ============ CONFIRM TEMÁTICO ============ -->
-<div id="confirmBox" class="sp-modal" hidden>
-  <div class="sp-confirm">
-    <div id="confirmMsg" class="sp-confirm-msg"></div>
-    <div class="sp-confirm-row">
-      <button id="confirmNo" class="btn-ghost">Cancelar</button>
-      <button id="confirmYes" class="btn">Confirmar</button>
+  <div id="modal" class="sp-modal" hidden onclick="if(event.target===this)Share.closeModal()">
+    <button class="sp-modal-x" onclick="Share.closeModal()">✕</button>
+    <div id="modalBody" class="sp-modal-body"></div>
+    <div id="modalCap" class="sp-modal-cap"></div>
+    <div id="shareRow" class="sp-share-row">
+      <span class="text-xs text-zinc-400">Compartilhar:</span>
+      <button class="btn-ghost" onclick="Share.via('wa')">WhatsApp</button>
+      <button class="btn-ghost" onclick="Share.via('copy')">Copiar link</button>
+      <button class="btn-ghost" onclick="Share.via('native')">⋯ Mais</button>
     </div>
   </div>
-</div>
 
-<!-- ============ COMPARTILHAR (só opções, sem mídia) ============ -->
-<div id="shareBox" class="sp-modal" hidden onclick="if(event.target===this)closeShare()">
-  <div class="sp-confirm">
-    <div id="shareName" class="sp-confirm-msg"></div>
-    <div class="sp-share-col">
-      <button class="btn-ghost" onclick="shareVia('wa')">💬 WhatsApp</button>
-      <button class="btn-ghost" onclick="shareVia('mail')">✉ E-mail</button>
-      <button class="btn-ghost" onclick="shareVia('gmail')">📧 Gmail</button>
-      <button class="btn-ghost" onclick="shareVia('copy')">🔗 Copiar link</button>
-      <button class="btn-ghost" onclick="shareVia('native')">⋯ Mais opções</button>
-      <button class="sp-link" onclick="closeShare()">Fechar</button>
+  <div id="inputBox" class="sp-modal" hidden>
+    <div class="sp-confirm"><div id="inputMsg" class="sp-confirm-msg"></div><input id="inputField" class="inp" />
+      <div class="sp-confirm-row"><button id="inputNo" class="btn-ghost">Cancelar</button><button id="inputYes" class="btn">Salvar</button></div>
     </div>
   </div>
-</div>
+  <div id="confirmBox" class="sp-modal" hidden>
+    <div class="sp-confirm"><div id="confirmMsg" class="sp-confirm-msg"></div>
+      <div class="sp-confirm-row"><button id="confirmNo" class="btn-ghost">Cancelar</button><button id="confirmYes" class="btn">Confirmar</button></div>
+    </div>
+  </div>
 
-<script src="js/app.js"></script>
+  <script src="js/core.js"></script>
+  <script src="modules/auth/auth.js"></script>
+  <script src="modules/auth/twofa.js"></script>
+  <script src="modules/drive/drive.js"></script>
+  <script src="modules/playlists/playlists.js"></script>
+  <script src="modules/player/player.js"></script>
+  <script src="modules/search/search.js"></script>
+  <script src="modules/upload/upload.js"></script>
+  <script src="modules/download/download.js"></script>
+  <script src="modules/share/share.js"></script>
+  <script src="modules/vault/vault.js"></script>
+  <script src="modules/profiles/profiles.js"></script>
+  <script src="modules/trash/trash.js"></script>
+  <script src="modules/system/system.js"></script>
+  <script src="modules/import/import.js"></script>
+  <script src="modules/admin/admin.js"></script>
+  <script src="modules/planos/planos.js"></script>
+  <script src="js/shell.js"></script>
 </body>
 </html>

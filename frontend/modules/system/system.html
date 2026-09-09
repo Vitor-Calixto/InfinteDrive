@@ -1,0 +1,32 @@
+<h1 class="sp-greet">Seu espaço 📊</h1>
+<div class="stat-grid">
+  <div class="stat-card"><div class="stat-label">Guardado</div><div id="uOrig" class="stat-val">–</div><div class="stat-hint">soma dos originais</div></div>
+  <div class="stat-card hot"><div class="stat-label">Ocupando</div><div id="uFinal" class="stat-val">–</div><div class="stat-hint">no disco agora</div></div>
+  <div class="stat-card green"><div class="stat-label">Economizado</div><div id="uSaved" class="stat-val">–</div><div class="stat-hint">pela compressão</div></div>
+  <div class="stat-card"><div class="stat-label">Arquivos</div><div id="uFiles" class="stat-val">–</div><div class="stat-hint">prontos</div></div>
+</div>
+<div class="card mt-4">
+  <div class="flex justify-between text-xs text-zinc-400"><span id="uUseLabel">–</span><span id="uQuotaLabel">–</span></div>
+  <div class="sp-bar big"><div id="uBar" style="width:0%"></div></div>
+  <div id="uProc" class="text-xs mt-2 text-zinc-400"></div>
+  <div id="uTrash" class="text-xs mt-1 text-zinc-400"></div>
+</div>
+<div class="card mt-4">
+  <h2 class="card-title">Por tipo</h2>
+  <div id="uKinds" class="kind-list"></div>
+</div>
+<div class="card mt-4">
+  <h2 class="card-title">🔐 Dois fatores (2FA)</h2>
+  <div id="tfaState" class="text-xs text-zinc-400">–</div>
+  <div id="tfaSetup" hidden>
+    <img id="tfaQr" class="mt-2" style="width:180px;border-radius:8px" alt="QR" />
+    <div id="tfaSecret" class="text-xs text-zinc-400 mt-1"></div>
+    <input id="tfa_code2" class="inp mt-2" inputmode="numeric" maxlength="6" placeholder="Código do app" autocomplete="one-time-code" />
+    <button onclick="TwoFA.enable()" class="btn">Ativar</button>
+    <pre id="tfaBackup" class="log mt-2" hidden></pre>
+  </div>
+  <div class="flex gap-2 mt-2">
+    <button onclick="TwoFA.setup()" class="btn-ghost">Configurar</button>
+    <button onclick="TwoFA.disable()" class="btn-ghost">Desligar</button>
+  </div>
+</div>

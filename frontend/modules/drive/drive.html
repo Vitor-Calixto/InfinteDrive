@@ -1,0 +1,25 @@
+<h1 class="sp-greet" id="greet">Boa noite 🌙</h1>
+<div id="dropzone" class="sp-drop">
+  Arraste foto, música ou vídeo aqui — ou <label class="sp-link">clique para escolher<input id="filePick" type="file" multiple class="hidden" style="display:none" onchange="Upload.send(this.files)" /></label>
+</div>
+<div id="upStatus" class="text-xs mt-2 text-zinc-400"></div>
+<div id="upBar" class="sp-progress" hidden><div id="upFill" style="width:0%"></div></div>
+<div id="upQueue" class="upq" hidden></div>
+<div id="procBanner" class="proc-banner" hidden></div>
+<div class="flex justify-between items-center mt-5 mb-2">
+  <h2 class="sp-h2">Seus arquivos</h2>
+  <div class="flex gap-2">
+    <select id="sortSel" class="inp" style="width:auto;margin:0" onchange="Drive.setSort(this.value)">
+      <option value="recent">Mais recentes</option>
+      <option value="oldest">Mais antigos</option>
+      <option value="az">Nome A–Z</option>
+      <option value="za">Nome Z–A</option>
+      <option value="biggest">Maiores</option>
+      <option value="smallest">Menores</option>
+    </select>
+    <button onclick="DlQueue.start()" class="btn-ghost">⬇ Baixar lista</button>
+    <button onclick="Drive.refresh()" class="btn-ghost">Atualizar</button>
+  </div>
+</div>
+<div id="dlQueue" class="upq" hidden></div>
+<div id="filesGrid" class="sp-grid"><span class="text-zinc-500 text-xs">Carregando…</span></div>

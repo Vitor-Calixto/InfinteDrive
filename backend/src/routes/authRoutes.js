@@ -4,7 +4,7 @@ import {
   createUser, verifyUser, signToken, publicUser,
   setPassword, bumpTokenVersion, findById, findByEmail,
   issueResetToken, consumeResetToken, setDev, setPlan, isLastAdmin,
-  findOrCreateGoogle, quotaFor,
+  findOrCreateGoogle, quotaFor, tfaSetupStart, tfaEnable, tfaCheck, tfaDisable,
 } from '../config/users.js';
 import { wipeUserData } from '../services/fileGuard.js';
 import { sendResetEmail } from '../services/mailer.js';
@@ -90,8 +90,49 @@ r.post('/login', loginLimiter, (req, res) => {
     if (!email || !password) return res.status(401).json({ error: 'Credenciais inválidas.' });
     const u = verifyUser(email, password);
     if (!u) return res.status(401).json({ error: 'Credenciais inválidas.' });
+    // 2FA ligado: senha ok, mas o JWT só sai no 2º passo.
+    if (u.tfaEnabled) return res.status(202).json({ tfaRequired: true, email: u.email });
     return res.json({ user: publicUser(u), token: signToken(u) });
   } catch (e) { return res.status(401).json({ error: e.message }); }
+});
+
+// POST /api/auth/2fa/verify { email, token } — 2º passo (TOTP ou backup).
+r.post('/2fa/verify', loginLimiter, (req, res) => {
+  try {
+    const { email, token } = req.body || {};
+    const u = findByEmail(String(email || '').trim().toLowerCase());
+    if (!u?.tfaEnabled) return res.status(401).json({ error: 'Credenciais inválidas.' });
+    if (!tfaCheck(u, token)) return res.status(401).json({ error: 'Código inválido.' });
+    return res.json({ user: publicUser(u), token: signToken(u) });
+  } catch (e) { return res.status(401).json({ error: e.message }); }
+});
+
+// POST /api/auth/2fa/setup — gera segredo + QR (autenticado).
+r.post('/2fa/setup', requireAuth, async (req, res) => {
+  try {
+    if (!req.user?.id || req.user.id === 'master') return res.status(400).json({ error: 'Entre com e-mail/senha.' });
+    const { secret, uri } = tfaSetupStart(req.user.id);
+    const QRCode = (await import('qrcode')).default;
+    const qr = await QRCode.toDataURL(uri);
+    return res.json({ secret, qr });
+  } catch (e) { return res.status(400).json({ error: e.message }); }
+});
+
+// POST /api/auth/2fa/enable { token } — confirma e ativa (devolve backups 1x).
+r.post('/2fa/enable', requireAuth, (req, res) => {
+  try {
+    if (!req.user?.id || req.user.id === 'master') return res.status(400).json({ error: 'Entre com e-mail/senha.' });
+    return res.json(tfaEnable(req.user.id, req.body?.token));
+  } catch (e) { return res.status(400).json({ error: e.message }); }
+});
+
+// POST /api/auth/2fa/disable { password } — desliga (pede a senha).
+r.post('/2fa/disable', requireAuth, (req, res) => {
+  try {
+    if (!req.user?.id || req.user.id === 'master') return res.status(400).json({ error: 'Entre com e-mail/senha.' });
+    tfaDisable(req.user.id, req.body?.password);
+    return res.json({ ok: true });
+  } catch (e) { return res.status(400).json({ error: e.message }); }
 });
 
 // GET /api/auth/config — público: diz se o botão Google está ativo.

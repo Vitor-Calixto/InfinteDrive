@@ -1,4 +1,4 @@
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { verifyToken, findById } from '../config/users.js';
 
 // Token mestre de recuperação (env). Login do dia a dia é JWT (offline).
@@ -53,12 +53,16 @@ export function requireAdminToken(req, res, next) {
   return requireAuth(req, res, next);
 }
 
-// Global folgado; endpoints sensíveis têm o próprio limiter abaixo.
+// Chave por usuário (não por IP): IP o atacante troca, conta não.
+// Rotas pós-login usam; login/contato continuam por IP (sem usuário ainda).
+const byUser = (req) => req.user?.id || ipKeyGenerator(req.ip);
 // Pula mídia (download/thumb) e health: o player dispara dezenas de ranges
 // e o monitor pinga de 5 em 5s — nenhum dos dois é abuso.
 export const globalLimiter = rateLimit({
+  // Backstop genérico (NÃO é o anti-brute-force: login tem o próprio teto).
+  // Lote legítimo (1 vídeo 4GB = 512 fatias) passa de 1000 req fácil.
   windowMs: 15 * 60 * 1000,
-  max: 600,
+  max: 5000,
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => /\/storage\/(download|thumb)\//.test(req.path || '') || req.path === '/api/health',
@@ -70,6 +74,7 @@ export const mediaLimiter = rateLimit({
   max: 5000,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: byUser,
   message: { error: 'Muitas faixas de mídia, aguarde 15 min.' },
 });
 
@@ -97,24 +102,28 @@ export const detectLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: byUser,
   message: { error: 'Muitas detecções, aguarde 1 min.' },
 });
 
-// Deploy dispara SSH na VPS: caro, limita por IP.
+// Deploy dispara SSH na VPS: caro, limita por usuário.
 export const deployLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: byUser,
   message: { error: 'Muitos deploys, aguarde 5 min.' },
 });
 
-// Upload/download de arquivos: folgado p/ lote (105 fotos de uma vez).
-// Abuso contido por auth + quota por usuário, não por contagem.
+// Upload/download de arquivos: lote grande é uso normal (242 arquivos,
+// 4GB = 512 fatias). Abuso contido por auth + quota + MAX_UPLOAD_MB,
+// não por contagem — o front respeita Retry-After e recua sozinho.
 export const fileLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 1000,
+  max: 10000,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: byUser,
   message: { error: 'Muitas operações de arquivo, aguarde 15 min.' },
 });

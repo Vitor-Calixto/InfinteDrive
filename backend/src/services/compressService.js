@@ -157,9 +157,14 @@ async function compressVideo(abs, meta) {
   const big = (meta.sizeOrig || 0) > 500 * 1024 * 1024;
   const preset = big ? 'ultrafast' : 'veryfast';
   try {
-    // Teto 720p/30fps + strip de metadados (GPS etc). Sem slow/AV1.
+    // Teto 720p/30fps + GOP longo (-g 300: ~5-10% em cabeça falante)
+    // + denoise leve (hqdn3d: ruído de celular/noite custa caro p/ codificar,
+    // +10-20% em fonte ruidosa sem perda visível) + strip de metadados.
+    // CRF 30: ~25% menor que 28, transparente para a maioria do conteúdo.
+    // Sem slow/AV1 (fila da VPS não pode parar horas).
+    // H.265 fica p/ segunda via fria quando o tier S3 existir.
     const bump = (pct) => { meta.progress = pct; upsertRow('storage', meta); };
-    await runFfmpegProgress(['-v', 'error', '-y', '-i', abs, '-map_metadata', '-1', '-vf', "scale='min(iw,1280)':-2", '-r', '30', '-c:v', 'libx264', '-crf', '28', '-preset', preset, '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', out], 3600000, meta.duration || 0, bump);
+    await runFfmpegProgress(['-v', 'error', '-y', '-i', abs, '-map_metadata', '-1', '-vf', "scale='min(iw,1280)':-2,hqdn3d=1.5:1.5:6:6", '-r', '30', '-g', '300', '-c:v', 'libx264', '-crf', '30', '-preset', preset, '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', out], 3600000, meta.duration || 0, bump);
     delete meta.progress;
     const nb = fs.statSync(out).size;
     const origLen = fs.statSync(abs).size;
