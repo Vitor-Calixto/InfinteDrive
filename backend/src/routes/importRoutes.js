@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireAuth, fileLimiter } from '../middlewares/auth.js';
-import { linkToken, startImport, jobStatus } from '../services/importService.js';
+import { linkToken, startImport, startPickerImport, createPickerSession, pickerSessionStatus, jobStatus } from '../services/importService.js';
 import { quotaFor } from '../config/users.js';
 
 const r = Router();
@@ -16,11 +16,34 @@ r.post('/link', async (req, res) => {
   } catch (e) { return res.status(400).json({ error: e.message }); }
 });
 
-// POST /api/import/drive/start | /photos/start — job em background.
+// POST /api/import/drive/start — Drive puxa tudo sozinho (background).
 r.post('/:source/start', (req, res) => {
   try {
     const quotaMB = Number(req.user.quotaMB) > 0 ? Number(req.user.quotaMB) : quotaFor(req.user.plan);
     return res.json(startImport(req.user.id, req.params.source, quotaMB));
+  } catch (e) { return res.status(400).json({ error: e.message }); }
+});
+
+// ---- Google Fotos (Picker): escolha numa aba do Google, download aqui.
+// POST /api/import/photos/session -> { sessionId, pickerUri }
+r.post('/photos/session', async (req, res) => {
+  try {
+    return res.json(await createPickerSession(req.user.id));
+  } catch (e) { return res.status(400).json({ error: e.message }); }
+});
+
+// GET /api/import/photos/session/:id -> { ready } (concluiu no Google?)
+r.get('/photos/session/:id', async (req, res) => {
+  try {
+    return res.json(await pickerSessionStatus(req.user.id, req.params.id));
+  } catch (e) { return res.status(400).json({ error: e.message }); }
+});
+
+// POST /api/import/photos/session/:id/start -> { id } (job da seleção)
+r.post('/photos/session/:id/start', async (req, res) => {
+  try {
+    const quotaMB = Number(req.user.quotaMB) > 0 ? Number(req.user.quotaMB) : quotaFor(req.user.plan);
+    return res.json(await startPickerImport(req.user.id, req.params.id, quotaMB));
   } catch (e) { return res.status(400).json({ error: e.message }); }
 });
 

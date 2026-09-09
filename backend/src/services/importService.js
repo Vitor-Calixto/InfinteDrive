@@ -16,8 +16,10 @@ const jobs = new Map(); // jobId -> { id, userId, source, status, total, done, e
 
 const NEED = {
   drive: 'https://www.googleapis.com/auth/drive.readonly',
-  photos: 'https://www.googleapis.com/auth/photoslibrary.readonly',
+  // Fotos usa a Picker API (a Library API morreu em 31/03/2025 p/ leitura geral).
+  photos: 'https://www.googleapis.com/auth/photospicker.mediaitems.readonly',
 };
+const PICKER = 'https://photospicker.googleapis.com/v1';
 
 export async function linkToken(userId, accessToken) {
   const r = await fetch(`https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`);
@@ -60,26 +62,49 @@ async function listDriveAll(token) {
   return out;
 }
 
-async function listPhotosAll(token) {
+// ---- Google Photos Picker: o usuário ESCOLHE numa aba do Google, a gente baixa.
+// 1) createPickerSession -> { sessionId, pickerUri } (front abre a URI)
+// 2) usuário escolhe e clica Concluir na aba do Google
+// 3) front chama startPickerImport(sessionId) -> job baixa a seleção
+async function pickerFetch(token, path, opts = {}) {
+  const r = await fetch(`${PICKER}${path}`, {
+    ...opts,
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(opts.headers || {}) },
+  });
+  if (r.status === 401) throw new Error('Google expirou a sessão. Conecte de novo.');
+  if (r.status === 403) throw new Error('Ative a "Google Photos Picker API" no projeto DriveSpotify (Cloud Console → APIs).');
+  if (!r.ok) throw new Error(`Google Fotos ${r.status}. Tente de novo.`);
+  return r.json();
+}
+
+export async function createPickerSession(userId) {
+  const token = takeToken(userId, 'photos');
+  const j = await pickerFetch(token, '/sessions', { method: 'POST', body: '{}' });
+  if (!j.id || !j.pickerUri) throw new Error('Google não abriu a sessão de escolha.');
+  return { sessionId: j.id, pickerUri: j.pickerUri };
+}
+
+export async function pickerSessionStatus(userId, sessionId) {
+  const token = takeToken(userId, 'photos');
+  const id = String(sessionId || '').replace(/[^A-Za-z0-9_-]/g, '');
+  if (!id) throw new Error('Sessão inválida.');
+  const j = await pickerFetch(token, `/sessions/${id}`);
+  return { ready: !!j.mediaItemsSet, mediaItemsSet: !!j.mediaItemsSet };
+}
+
+async function listPickerItems(token, sessionId) {
   const out = [];
   let page = '';
   for (let i = 0; i < 100; i++) {
-    const r = await fetch('https://photoslibrary.googleapis.com/v1/mediaItems:search', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pageSize: 100, pageToken: page || undefined }),
-    });
-    if (r.status === 401) throw new Error('Google expirou a sessão. Conecte de novo.');
-    if (!r.ok) throw new Error(`Google Fotos ${r.status}. Tente de novo.`);
-    const j = await r.json();
+    const j = await pickerFetch(token, `/sessions/${sessionId}/mediaItems?pageSize=100${page ? `&pageToken=${encodeURIComponent(page)}` : ''}`);
     for (const m of j.mediaItems || []) {
+      const mf = m.mediaFile || {};
       out.push({
         id: m.id,
-        name: m.filename || `${m.id}.jpg`,
-        mime: m.mimeType || 'image/jpeg',
+        name: mf.filename || `${m.id}.jpg`,
+        mime: mf.mimeType || 'image/jpeg',
         size: 0,
-        baseUrl: m.baseUrl,
-        photo: !!m.mediaMetadata?.photo,
+        baseUrl: mf.baseUrl,
       });
     }
     page = j.nextPageToken || '';
@@ -142,11 +167,12 @@ async function storeDownloaded(userId, quotaMB, tmpPath, { name, mime }) {
   return meta;
 }
 
-async function runJob(job) {
+async function runJob(job, itemsOverride) {
   const { userId, source, quotaMB } = job;
   try {
     const token = takeToken(userId, source);
-    const items = source === 'drive' ? await listDriveAll(token) : await listPhotosAll(token);
+    const items = itemsOverride || (source === 'drive' ? await listDriveAll(token) : []);
+    if (!itemsOverride && source !== 'drive') throw new Error('Use a escolha do Google Fotos (Picker).');
     job.total = items.length;
     const MAX = Number(process.env.MAX_UPLOAD_MB) > 0 ? Number(process.env.MAX_UPLOAD_MB) * 1024 * 1024 : 10 * 1024 * 1024 * 1024;
     // Paralelismo configurável (IMPORT_WORKERS, padrão 4): rede é o gargalo,
@@ -183,19 +209,39 @@ async function runJob(job) {
   job.finishedAt = new Date().toISOString();
 }
 
-export function startImport(userId, source, quotaMB) {
-  if (!['drive', 'photos'].includes(source)) throw new Error('Fonte inválida.');
+function newJob(userId, source, quotaMB) {
   for (const j of jobs.values()) {
     if (j.userId === userId && j.status === 'running') throw new Error('Já tem importação rodando.');
   }
-  takeToken(userId, source); // falha rápido: sem vínculo/escopo, nem cria o job
   const job = {
     id: randomUUID(), userId, source, quotaMB,
     status: 'running', total: 0, done: 0, errors: [],
     startedAt: new Date().toISOString(), finishedAt: '',
   };
   jobs.set(job.id, job);
+  return job;
+}
+
+export function startImport(userId, source, quotaMB) {
+  // Drive puxa tudo sozinho; Fotos vai pelo Picker (startPickerImport).
+  if (source !== 'drive') throw new Error('Fotos: escolha na janela do Google primeiro.');
+  takeToken(userId, source); // falha rápido: sem vínculo/escopo, nem cria o job
+  const job = newJob(userId, source, quotaMB);
   runJob(job).catch(() => {});
+  return { id: job.id };
+}
+
+// Fotos (Picker): baixa a SELEÇÃO de uma sessão já concluída no Google.
+export async function startPickerImport(userId, sessionId, quotaMB) {
+  const token = takeToken(userId, 'photos');
+  const id = String(sessionId || '').replace(/[^A-Za-z0-9_-]/g, '');
+  if (!id) throw new Error('Sessão inválida.');
+  const st = await pickerFetch(token, `/sessions/${id}`);
+  if (!st.mediaItemsSet) throw new Error('Escolha as fotos na aba do Google e clique Concluir primeiro.');
+  const items = await listPickerItems(token, id);
+  if (!items.length) throw new Error('Nenhuma foto escolhida.');
+  const job = newJob(userId, 'photos', quotaMB);
+  runJob(job, items).catch(() => {});
   return { id: job.id };
 }
 
