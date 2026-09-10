@@ -1,6 +1,8 @@
 import { Router } from 'express';
+import fs from 'node:fs';
+import path from 'node:path';
 import { requireAuth, fileLimiter } from '../middlewares/auth.js';
-import { linkToken, startImport, startPickerImport, createPickerSession, pickerSessionStatus, jobStatus } from '../services/importService.js';
+import { linkToken, startImport, startPickerImport, createPickerSession, pickerSessionStatus, jobStatus, ensureAccess } from '../services/importService.js';
 import { quotaFor } from '../config/users.js';
 
 const r = Router();
@@ -17,10 +19,10 @@ r.post('/link', async (req, res) => {
 });
 
 // POST /api/import/drive/start — Drive puxa tudo sozinho (background).
-r.post('/:source/start', (req, res) => {
+r.post('/:source/start', async (req, res) => {
   try {
     const quotaMB = Number(req.user.quotaMB) > 0 ? Number(req.user.quotaMB) : quotaFor(req.user.plan);
-    return res.json(startImport(req.user.id, req.params.source, quotaMB));
+    return res.json(await startImport(req.user.id, req.params.source, quotaMB));
   } catch (e) { return res.status(400).json({ error: e.message }); }
 });
 
@@ -45,6 +47,22 @@ r.post('/photos/session/:id/start', async (req, res) => {
     const quotaMB = Number(req.user.quotaMB) > 0 ? Number(req.user.quotaMB) : quotaFor(req.user.plan);
     return res.json(await startPickerImport(req.user.id, req.params.id, quotaMB));
   } catch (e) { return res.status(400).json({ error: e.message }); }
+});
+
+// GET /api/import/status -> { drive, photos } (vínculo válido agora?)
+r.get('/status', async (req, res) => {
+  const out = { drive: false, photos: false };
+  try { await ensureAccess(req.user.id, 'drive'); out.drive = true; } catch {}
+  try { await ensureAccess(req.user.id, 'photos'); out.photos = true; } catch {}
+  return res.json(out);
+});
+
+// POST /api/import/picklog { ev } — rastro do front p/ diagnosticar o Picker.
+r.post('/picklog', (req, res) => {
+  try {
+    fs.appendFileSync(path.join(process.cwd(), 'data', 'picker-debug.log'), `${new Date().toISOString()} FRONT ${String(req.body?.ev || '').slice(0, 160)}\n`);
+  } catch {}
+  return res.json({ ok: true });
 });
 
 r.get('/jobs/:id', (req, res) => {

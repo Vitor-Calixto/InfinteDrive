@@ -1,85 +1,222 @@
 // import.js — Drive (puxa tudo) + Fotos (Picker: escolhe no Google, traz aqui).
+// Vínculo por REDIRECT (sem popup): /api/auth/google/start -> Google -> volta ?import=.
 const ImportMod = (() => {
   let pickerSession = '';
-  async function show() {}
-  // Se a janela de permissão não voltar em 2min (popup bloqueado/fechado),
-  // desiste com mensagem em vez de travar pra sempre na aba em branco.
-  function tokenWithTimeout(scope, ms = 120000) {
-    return Promise.race([
-      googleToken(scope),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('A janela de permissão não respondeu. Libere POPUPS para este site e para accounts.google.com, depois tente de novo.')), ms)),
-    ]);
-  }
-  // Pede um access token de escopo ao Google (GIS) e vincula no backend.
-  async function googleToken(scope) {
-    const cfg = await (await fetch(api() + '/auth/config')).json();
-    if (!cfg.google) throw new Error('Login Google desativado no servidor.');
-    return new Promise((resolve, reject) => {
-      const ensureGis = (done) => {
-        if (window.google?.accounts?.oauth2) return done();
-        const s = document.createElement('script');
-        s.src = 'https://accounts.google.com/gsi/client';
-        s.onload = done;
-        s.onerror = () => reject(new Error('Sem internet pro Google.'));
-        document.head.appendChild(s);
-      };
-      ensureGis(() => {
-        try {
-          const client = window.google.accounts.oauth2.initTokenClient({
-            client_id: cfg.clientId,
-            scope,
-            callback: (t) => (t?.access_token ? resolve(t.access_token) : reject(new Error('Permissão negada.'))),
-          });
-          client.requestAccessToken();
-        } catch (e) { reject(e); }
-      });
-    });
-  }
-  async function from(source) {
-    if (!getToken()) return toast('Entre primeiro.');
-    if (source === 'photos') return fromPhotos();
-    try {
-      const access = await tokenWithTimeout('https://www.googleapis.com/auth/drive.readonly');
-      await jpost('/import/link', { accessToken: access });
-      const job = await jpost('/import/drive/start', {});
-      poll(job.id);
-    } catch (e) { toast('Erro: ' + e.message); }
-  }
   function fail(msg) {
+    // 404 no Picker = sessão de escolha expirou: o recomeço é escolher de novo.
+    if (/fotos 404/i.test(msg || '')) {
+      pickerSession = '';
+      storeSid('');
+      msg = 'A escolha expirou no Google. Clique Importar Fotos e escolha de novo.';
+    }
     const st = $('impStatus');
     if (st) st.textContent = 'Erro: ' + msg; // fica escrito (toast some em 5s)
     toast('Erro: ' + msg);
   }
-  // Fotos (Picker API): abre a escolha numa aba do Google; ao concluir, traz.
-  async function fromPhotos() {
-    const st = $('impStatus');
-    // Aba aberta AQUI (no clique): depois dos awaits o navegador bloqueia popup.
-    let tab = null;
-    try { tab = window.open('', '_blank'); } catch {}
+  // Ao voltar do Google (?import=), retoma sozinho onde parou.
+  async function show() {
+    let imp = '', msg = '';
     try {
-      if (st) st.textContent = 'Pedindo permissão ao Google… (complete na janela que abriu)';
-      const access = await tokenWithTimeout('https://www.googleapis.com/auth/photospicker.mediaitems.readonly');
-      if (st) st.textContent = 'Abrindo a escolha do Google Fotos…';
-      await jpost('/import/link', { accessToken: access });
-      const s = await jpost('/import/photos/session', {});
-      pickerSession = s.sessionId;
-      if (tab && !tab.closed) tab.location.href = s.pickerUri;
-      else if (st) st.innerHTML = `Popup bloqueado — <a href="${s.pickerUri}" target="_blank" class="sp-link">clique aqui pra escolher</a>. Depois volte e aperte o botão abaixo.<br><button class="btn mt-2" onclick="ImportMod.bringPhotos()">Concluí no Google, trazer agora</button>`;
-      if (tab && !tab.closed && st && !st.querySelector('button')) {
-        st.innerHTML = `Escolha as fotos na aba do Google e clique <b>Concluir</b> lá. Depois volte aqui e aperte o botão abaixo.<br><button class="btn mt-2" onclick="ImportMod.bringPhotos()">Concluí no Google, trazer agora</button>`;
+      const q = new URLSearchParams(location.search);
+      imp = q.get('import') || '';
+      msg = q.get('msg') || 'Falha ao vincular.';
+    } catch {}
+    if (!imp) {
+      // Voltou do picker (mesma aba) pelo histórico: retoma a vigia sozinho.
+      // Só sessão FRESCA: velha é descartada (era o 404 fantasma).
+      const sid = freshStoredSid();
+      if (sid && getToken()) { pickerSession = sid; watchPicker(null, true); }
+      return;
+    }
+    try { history.replaceState(null, '', location.pathname); } catch {}
+    if (imp === 'drive') {
+      try {
+        const job = await jpost('/import/drive/start', {});
+        poll(job.id);
+      } catch (e) { fail(e.message); }
+      return;
+    }
+    if (imp === 'photos') { openPickerChoice(); return; }
+    if (imp === 'erro') fail(msg);
+  }
+  function go(scope) {
+    if (!getToken()) return toast('Entre primeiro.');
+    // Navegação normal (redirect): nenhum popup/cookie bloqueia.
+    location.href = api() + '/auth/google/start?scope=' + scope + '&token=' + encodeURIComponent(getToken());
+  }
+  async function from(source) {
+    if (!getToken()) return toast('Entre primeiro.');
+    if (source === 'photos') return fromPhotosFast();
+    return go('drive');
+  }
+  // Caminho rápido (vínculo válido por dias): sem redirect, abre no clique.
+  async function fromPhotosFast() {
+    const st = $('impStatus');
+    // Popup de verdade (janelinha): fecha sozinha ao concluir = "volta pro app".
+    let tab = null;
+    try { tab = window.open('', 'gphotos_picker', 'width=1024,height=720,menubar=no,toolbar=no'); } catch {}
+    try {
+      let linked = false;
+      try { linked = (await jget('/import/status')).photos; } catch {}
+      if (!linked) {
+        try { if (tab && !tab.closed) tab.close(); } catch {}
+        return go('photos'); // 1ª vez (ou expirado): vincula por redirect
       }
+      if (st) st.textContent = 'Abrindo a escolha do Google Fotos…';
+      await openPickerDirect(tab);
     } catch (e) {
       try { if (tab && !tab.closed) tab.close(); } catch {}
       fail(e.message);
     }
   }
+  // Fotos já vinculado: abre o picker e traz SOZINHO (poll → start → fecha aba).
+  async function openPickerDirect(tab) {
+    const st = $('impStatus');
+    try {
+      const s = await jpost('/import/photos/session', {});
+      pickerSession = s.sessionId;
+      storeSid(s.sessionId);
+      if (tab && !tab.closed) {
+        tab.location.href = pickUrl(s.pickerUri);
+        if (st) st.textContent = 'Escolha as fotos e clique Concluir — o resto é automático.';
+        watchPicker(tab);
+        return;
+      }
+      // Sem janelinha: link (app nunca navega pra fora sozinho).
+      const uri = String(pickUrl(s.pickerUri)).replace(/"/g, '&quot;');
+      if (st) st.innerHTML = `Clique pra escolher no Google (esta tela continua aberta):<br><a class="btn mt-2" style="display:inline-block;text-decoration:none" href="${uri}" target="_blank" rel="noopener">Abrir Google Fotos</a>`;
+      if (st) st.innerHTML += `<div class="text-xs mt-1 text-zinc-400">Escolha e clique Concluir — o resto é automático.</div>`;
+      watchPicker(null);
+    } catch (e) {
+      try { if (tab && !tab.closed) tab.close(); } catch {}
+      fail(e.message);
+    }
+  }
+  // Pós-redirect (?import=photos): UMA sessão; janelinha se der, link se não.
+  // App nunca navega pra fora sozinho.
+  async function openPickerChoice() {
+    const st = $('impStatus');
+    // Retomada: voltou do picker pelo histórico com sessão FRESCA pendente.
+    const sid = freshStoredSid();
+    if (sid) {
+      pickerSession = sid;
+      storeSid('');
+      watchPicker(null, true);
+      return;
+    }
+    // Janelinha primeiro (fecha sozinha ao concluir).
+    let tab = null;
+    try { tab = window.open('', 'gphotos_picker', 'width=1024,height=720,menubar=no,toolbar=no'); } catch {}
+    if (tab && !tab.closed) {
+      try {
+        const s = await jpost('/import/photos/session', {});
+        pickerSession = s.sessionId;
+        storeSid(s.sessionId);
+        tab.location.href = pickUrl(s.pickerUri);
+        if (st) st.textContent = 'Escolha as fotos e clique Concluir — o resto é automático.';
+        watchPicker(tab);
+        return;
+      } catch (e) { try { tab.close(); } catch {} fail(e.message); return; }
+    }
+    // Popup bloqueado: link (clique abre em nova aba, app intacto).
+    if (st) st.innerHTML = `Clique pra escolher no Google (esta tela continua aberta):<br><a class="btn mt-2" style="display:inline-block;text-decoration:none" href="#" onclick="ImportMod.openLink(event)">Abrir Google Fotos</a>`;
+  }
+  // Link da escolha (clique = gesto: abre mesmo com popup bloqueado).
+  async function openLink(ev) {
+    ev?.preventDefault();
+    const st = $('impStatus');
+    try {
+      if (st) st.textContent = 'Abrindo a escolha…';
+      const s = await jpost('/import/photos/session', {});
+      pickerSession = s.sessionId;
+      storeSid(s.sessionId);
+      window.open(pickUrl(s.pickerUri), '_blank', 'noopener');
+      if (st) st.textContent = 'Escolha as fotos e clique Concluir — o resto é automático.';
+      watchPicker(null);
+    } catch (e) { fail(e.message); }
+  }
+  function plog(ev) {
+    try { jpost('/import/picklog', { ev }).catch(() => {}); } catch {}
+  }
+  // Doc oficial: pickerUri + /autoclose fecha a aba sozinha após o Concluir.
+  const pickUrl = (u) => String(u || '').replace(/\/$/, '') + '/autoclose';
+  let watching = false; // trava clique-duplo (2 sessões = confusão + expira a outra)
+  function storeSid(sid) {
+    try {
+      if (sid) { sessionStorage.setItem('pick_sid', sid); sessionStorage.setItem('pick_ts', String(Date.now())); }
+      else { sessionStorage.removeItem('pick_sid'); sessionStorage.removeItem('pick_ts'); }
+    } catch {}
+  }
+  // Retoma SÓ sessão fresca (<15min): sid velho (outra aba/dia) é descartado,
+  // nunca vigiado — era ele que dava 404 fantasma.
+  function freshStoredSid() {
+    try {
+      const sid = sessionStorage.getItem('pick_sid') || '';
+      const ts = Number(sessionStorage.getItem('pick_ts') || 0);
+      if (sid && Date.now() - ts < 15 * 60 * 1000) return sid;
+      if (sid) storeSid('');
+    } catch {}
+    return '';
+  }
+  // Vigia a sessão: concluiu no Google? Inicia o job e fecha a aba sozinha.
+  async function watchPicker(tab, retried) {
+    if (watching) { plog('watch-ignorado-duplo sid=' + pickerSession); return; }
+    watching = true;
+    plog('watch-ini sid=' + pickerSession + ' retried=' + !!retried);
+    const st = $('impStatus');
+    try {
+      for (let i = 0; i < 100; i++) {
+        await new Promise((r) => setTimeout(r, 3000));
+        let dead = false, ready = false, errm = '';
+        try {
+          const s = await jget(`/import/photos/session/${pickerSession}`);
+          ready = !!s.ready;
+        } catch (e) { errm = String(e.message || e).slice(0, 80); dead = /fotos 404/i.test(e.message || ''); }
+        if (ready) { plog('watch-ready sid=' + pickerSession); break; }
+        if (dead) plog('watch-dead sid=' + pickerSession + ' err=' + errm);
+        if (dead) {
+          // Sessão podre (velha/outra aba): troca pela nova e continua vigiando.
+          if (retried) { fail('Google Fotos 404. Tente de novo.'); return; }
+          try {
+            const ns = await jpost('/import/photos/session', {});
+            pickerSession = ns.sessionId;
+            storeSid(ns.sessionId);
+            if (tab && !tab.closed) tab.location.href = pickUrl(ns.pickerUri);
+            else if (st) st.innerHTML = `Sessão antiga descartada — escolha na nova página:<br><a class="btn mt-2" style="display:inline-block;text-decoration:none" href="${String(ns.pickerUri || '').replace(/"/g, '&quot;')}" target="_blank" rel="noopener">Abrir Google Fotos</a>`;
+            retried = true;
+            continue;
+          } catch (e2) { fail(e2.message); return; }
+        }
+        if (st) st.textContent = `Escolha as fotos no Google e clique Concluir… (aguardando ${i + 1})`;
+      }
+      plog('watch-start sid=' + pickerSession);
+      try {
+        const job = await jpost(`/import/photos/session/${pickerSession}/start`, {});
+        plog('watch-started job=' + job.id);
+        pickerSession = '';
+        storeSid('');
+        try { if (tab && !tab.closed) tab.close(); } catch {}
+        poll(job.id);
+      } catch (e) { plog('watch-start-fail ' + String(e.message || e).slice(0, 100)); fail(e.message); }
+    } finally { watching = false; }
+  }
   async function bringPhotos() {
     const st = $('impStatus');
     try {
       if (!pickerSession) throw new Error('Abra a escolha primeiro (Importar Fotos).');
-      const s = await jget(`/import/photos/session/${pickerSession}`);
-      if (!s.ready) {
-        if (st) st.textContent = 'Ainda não concluiu no Google. Escolha e clique Concluir na aba, depois tente de novo.';
+      // O Google libera a seleção segundos DEPOIS do Concluir: espera sozinho.
+      let ready = false, lastErr = '';
+      for (let i = 0; i < 30; i++) {
+        try {
+          const s = await jget(`/import/photos/session/${pickerSession}`);
+          if (s.ready) { ready = true; break; }
+          lastErr = 'aguardando liberação';
+        } catch (e) { lastErr = String(e.message || e).slice(0, 120); }
+        if (st) st.textContent = `Aguardando o Google liberar a escolha… (${i + 1}/30)`;
+        await new Promise((r) => setTimeout(r, 3000));
+      }
+      if (!ready) {
+        if (st) st.textContent = `Google não liberou (${lastErr}). Volte na aba, confira se clicou Concluir, e aperte o botão de novo.`;
         return;
       }
       const job = await jpost(`/import/photos/session/${pickerSession}/start`, {});
@@ -108,6 +245,6 @@ const ImportMod = (() => {
     };
     tick();
   }
-  return { show, from, bringPhotos };
+  return { show, from, bringPhotos, openLink };
 })();
 window.ImportMod = ImportMod;

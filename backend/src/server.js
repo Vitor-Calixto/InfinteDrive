@@ -68,7 +68,7 @@ app.use(compression({
 }));
 app.use(globalLimiter);
 
-app.get('/api/health', (req, res) => res.json({ status: 'OK', system: 'contabo-deploy-dashboard' }));
+app.get('/api/health', (req, res) => res.json({ status: 'OK', system: 'contabo-deploy-dashboard', build: 'v10' }));
 // Link público de compartilhamento: fora do guard de login de propósito.
 app.use('/s', sharePublic);
 // Auth local (offline): registro-bootstrap e login são públicos;

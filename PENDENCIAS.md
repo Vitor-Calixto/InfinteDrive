@@ -3,7 +3,9 @@
 > Estado em 09/09/2026. Commitado como está; resolver na sequência.
 
 ## 🔴 Travando uso real
-- [ ] **Popup de permissão do Google não abre no Firefox** — GIS `requestAccessToken` fica pendurado (aba em branco). Suspeita: ETP/cookies 3rd-party + bloqueio de popup. Workaround: escudo desligado p/ `localhost:4000` e `accounts.google.com` + popups permitidos. Alternativa robusta: fluxo OAuth por **redirect** (pede `GOOGLE_CLIENT_SECRET` no backend + URI `/api/import/google/callback` no Console).
+- [x] **Popup de permissão do Google (Firefox)** — resolvido por **redirect OAuth** + refresh persistido criptografado. Console feito (secret, redirect URI, Drive API, Picker API, escopos, test user).
+- [x] **Import Drive e2e** — validado 26/26 (após fix `downloadTo` web stream).
+- [x] **Google Fotos Picker e2e** — validado (endpoint correto `/v1/mediaItems?sessionId=`, `/autoclose`). Doc em `DOCS-GOOGLE.md`.
 - [ ] **Google Fotos Picker e2e** — código pronto (sessão → escolha → job), falta validar de ponta a ponta (bloqueado pelo item acima). Falta no Console: ativar **Google Photos Picker API** + escopo `photospicker.mediaitems.readonly`.
 - [ ] **Import Drive e2e** — pipeline pronto, falta teste real com conta (isola se o problema é só Fotos ou o popup em geral).
 - [ ] **Verificação do app no Google** — "DriveSpotify não verificado". Hoje: modo Teste + e-mail em usuários de teste. Produção p/ terceiros exige submissão (privacidade, vídeo demo).

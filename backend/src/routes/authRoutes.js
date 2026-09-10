@@ -1,5 +1,7 @@
 import { Router } from 'express';
+import { randomUUID } from 'node:crypto';
 import { readCollection } from '../config/store.js';
+import { linkRefresh } from '../services/importService.js';
 import {
   createUser, verifyUser, signToken, publicUser,
   setPassword, bumpTokenVersion, findById, findByEmail,
@@ -159,6 +161,64 @@ r.post('/google', loginLimiter, async (req, res) => {
     return res.json({ user: publicUser(u), token: signToken(u) });
   } catch {
     return res.status(401).json({ error: 'Login Google inválido.' });
+  }
+});
+
+// ---- Google OAuth por redirect (sem popup: nada bloqueia).
+// /auth/google/start?scope=drive|photos (JWT via ?token=) -> Google ->
+// /api/auth/google/callback -> volta pro front com ?import=drive|photos|erro.
+// Pede GOOGLE_CLIENT_SECRET no .env + redirect URI cadastrada no Console.
+const G_SCOPES = {
+  drive: 'https://www.googleapis.com/auth/drive.readonly',
+  photos: 'https://www.googleapis.com/auth/photospicker.mediaitems.readonly',
+};
+const gNonces = new Map(); // state -> { userId, scope, exp } (uso único, 10min)
+const gRedirectUri = () => `${String(process.env.PUBLIC_URL || 'http://localhost:4000').replace(/\/$/, '')}/api/auth/google/callback`;
+
+r.get('/google/start', requireAuth, (req, res) => {
+  const clientId = (process.env.GOOGLE_CLIENT_ID || '').trim();
+  const secret = (process.env.GOOGLE_CLIENT_SECRET || '').trim();
+  if (!clientId || !secret) return res.status(400).json({ error: 'Falta GOOGLE_CLIENT_ID/SECRET no servidor.' });
+  const scope = req.query.scope === 'photos' ? 'photos' : 'drive';
+  const nonce = randomUUID();
+  gNonces.set(nonce, { userId: req.user.id, scope, exp: Date.now() + 10 * 60 * 1000 });
+  const u = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+  u.searchParams.set('client_id', clientId);
+  u.searchParams.set('redirect_uri', gRedirectUri());
+  u.searchParams.set('response_type', 'code');
+  u.searchParams.set('scope', G_SCOPES[scope]);
+  u.searchParams.set('access_type', 'offline');
+  u.searchParams.set('prompt', 'consent'); // garante refresh_token a cada vínculo
+  u.searchParams.set('state', nonce);
+  return res.redirect(u.toString());
+});
+
+r.get('/google/callback', async (req, res) => {
+  const front = String(process.env.PUBLIC_URL || 'http://localhost:4000').replace(/\/$/, '');
+  const back = (msg, kind = 'erro') => res.redirect(`${front}/?import=${kind}&msg=${encodeURIComponent(msg)}`);
+  try {
+    const { code, state, error } = req.query || {};
+    if (error) return back('Permissão negada no Google.');
+    const n = gNonces.get(String(state || ''));
+    gNonces.delete(String(state || ''));
+    if (!n || Date.now() > n.exp) return back('Sessão expirou. Tente de novo.');
+    if (!code) return back('Sem código do Google.');
+    const clientId = (process.env.GOOGLE_CLIENT_ID || '').trim();
+    const secret = (process.env.GOOGLE_CLIENT_SECRET || '').trim();
+    const t = await (await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code: String(code), client_id: clientId, client_secret: secret,
+        redirect_uri: gRedirectUri(), grant_type: 'authorization_code',
+      }),
+    })).json();
+    // O code só vale p/ nosso client+redirect: sem vínculo trocado não há fraude.
+    if (!t.access_token || !t.refresh_token) return back('Google não devolveu o vínculo.');
+    linkRefresh(n.userId, { refreshToken: t.refresh_token, accessToken: t.access_token, scopes: String(t.scope || '').split(' ') });
+    return res.redirect(`${front}/?import=${n.scope}`);
+  } catch {
+    return back('Falha ao vincular.');
   }
 });
 
