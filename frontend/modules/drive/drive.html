@@ -6,6 +6,7 @@
 <div id="upBar" class="sp-progress" hidden><div id="upFill" style="width:0%"></div></div>
 <div id="upQueue" class="upq" hidden></div>
 <div id="procBanner" class="proc-banner" hidden></div>
+<div id="addBanner" class="proc-banner" hidden></div>
 <div class="flex justify-between items-center mt-5 mb-2">
   <h2 class="sp-h2">Seus arquivos <span id="fileCount" class="text-xs text-zinc-400"></span></h2>
   <div class="flex gap-2">
@@ -19,6 +20,7 @@
     </select>
     <button onclick="DlQueue.start()" class="btn-ghost">⬇ Baixar lista</button>
     <button onclick="Drive.cleanBroken()" class="btn-ghost">🧹 Quebrados</button>
+    <button onclick="Drive.cleanAll()" class="btn-ghost">🗑 Excluir tudo</button>
     <button onclick="Drive.refresh()" class="btn-ghost">Atualizar</button>
   </div>
 </div>

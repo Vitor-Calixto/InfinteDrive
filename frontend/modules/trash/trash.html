@@ -1,4 +1,7 @@
 <h1 class="sp-greet">Lixeira 🗑</h1>
 <p class="hint">Apaga sozinho em 30 dias. <span id="trashCount" class="text-zinc-400"></span></p>
-<button onclick="Trash.empty()" class="btn-ghost">Esvaziar tudo</button>
+<div class="flex gap-2">
+  <button onclick="Trash.restoreAll()" class="btn-ghost">Restaurar tudo</button>
+  <button onclick="Trash.empty()" class="btn-ghost">Esvaziar tudo</button>
+</div>
 <div id="trashGrid" class="sp-grid mt-2"></div>

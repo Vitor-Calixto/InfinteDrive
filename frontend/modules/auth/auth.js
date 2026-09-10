@@ -50,35 +50,29 @@ const Auth = (() => {
     } catch (e) { $('forgotState').textContent = 'Erro: ' + e.message; }
   }
   function logout() { setToken(''); setLogged(false); show('login'); }
-  // Integração Google (login + foto no avatar): ativa sozinha quando o
-  // backend tiver GOOGLE_CLIENT_ID. Sem backend, falha em silêncio (demo ok).
-  async function initGoogle() {
-    if (location.search.includes('demo') || location.hash.includes('demo')) return; // demo: sem backend, sem 404 no console
-    try {
-      const cfg = await (await fetch(api() + '/auth/config')).json();
-      if (!cfg.google || window.google || document.getElementById('gisScript')) return;
-      const s = document.createElement('script');
-      s.id = 'gisScript';
-      s.src = 'https://accounts.google.com/gsi/client';
-      s.async = true; s.defer = true;
-      s.onload = () => {
-        try {
-          window.google.accounts.id.initialize({ client_id: cfg.clientId, callback: googleLogin });
-          window.google.accounts.id.renderButton($('googleBtn'), { theme: 'filled_black', size: 'large', width: 320 });
-        } catch {}
-      };
-      document.head.appendChild(s);
-    } catch {}
+  // Login Google por redirect (sem popup GIS — o popup branco travava).
+  function googleLogin() {
+    location.href = api() + '/auth/google/login/start';
   }
-  async function googleLogin(resp) {
+  async function initGoogle() {} // legado: botão GIS removido (redirect não precisa)
+  // Volta do Google (?glogin=ticket): troca pelo JWT e entra.
+  async function consumeTicket() {
+    let t = '';
+    try { t = new URLSearchParams(location.search).get('glogin') || ''; } catch {}
+    if (!t) return false;
+    try { history.replaceState(null, '', location.pathname); } catch {}
+    if (t === 'cancel') { toast('Login cancelado no Google.'); return true; }
+    if (t === 'erro') { toast('Google não confirmou. Tente de novo.'); return true; }
     try {
-      const r = await jpost('/auth/google', { credential: resp.credential });
-      after(r.user, r.token); // r.user traz name + picture -> vira foto no avatar
+      const r = await jpost('/auth/google/consume', { ticket: t });
+      after(r.user, r.token);
     } catch (e) { toast('Erro: ' + e.message); }
+    return true;
   }
   async function me() {
     // Modo demo front-only: ?demo=1 ou #demo — valida tudo sem backend
     if (location.search.includes('demo') || location.hash.includes('demo')) { demo(); return; }
+    try { if (await consumeTicket()) return; } catch {}
     if (!getToken()) { setLogged(false); show('login'); return; }
     try {
       const u = await jget('/auth/me');
@@ -110,6 +104,6 @@ const Auth = (() => {
     try { window.Shell?.paintUser?.(user); } catch {}
     // Drive usa _files quando a API falha — nada a injetar, Drive.refresh() já usa mock no demo
   }
-  return { show, login, verify2fa, register, forgot, logout, me, lost, initGoogle };
+  return { show, login, verify2fa, register, forgot, logout, me, lost, initGoogle, googleLogin };
 })();
 window.Auth = Auth;

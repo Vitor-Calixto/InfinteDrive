@@ -3,6 +3,7 @@ const Shell = (() => {
   const VIEWS = {
     drive: { html: 'modules/drive/drive.html', css: ['modules/drive/drive.css', 'modules/upload/upload.css', 'modules/download/download.css'], js: null, onShow: () => Drive.show() },
     playlists: { html: 'modules/playlists/playlists.html', css: 'modules/playlists/playlists.css', js: null, onShow: () => Playlists.show() },
+    profiles: { html: 'modules/profiles/profiles.html', css: 'modules/profiles/profiles.css', js: null, onShow: () => Profiles.show() },
     system: { html: 'modules/system/system.html', css: 'modules/system/system.css', onShow: () => System.show() },
     planos: { html: 'modules/planos/planos.html', css: 'modules/planos/planos.css', onShow: () => Planos.show() },
     import: { html: 'modules/import/import.html', css: 'modules/import/import.css', onShow: () => ImportMod.show() },

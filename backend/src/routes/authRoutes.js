@@ -171,7 +171,9 @@ r.post('/google', loginLimiter, async (req, res) => {
 const G_SCOPES = {
   drive: 'https://www.googleapis.com/auth/drive.readonly',
   photos: 'https://www.googleapis.com/auth/photospicker.mediaitems.readonly',
+  login: 'openid email profile',
 };
+const gTickets = new Map(); // ticket -> { userId, exp } (login redirect, uso único, 5min)
 const gNonces = new Map(); // state -> { userId, scope, exp } (uso único, 10min)
 const gRedirectUri = () => `${String(process.env.PUBLIC_URL || 'http://localhost:4000').replace(/\/$/, '')}/api/auth/google/callback`;
 
@@ -193,27 +195,77 @@ r.get('/google/start', requireAuth, (req, res) => {
   return res.redirect(u.toString());
 });
 
+async function exchangeCode(code) {
+  const clientId = (process.env.GOOGLE_CLIENT_ID || '').trim();
+  const secret = (process.env.GOOGLE_CLIENT_SECRET || '').trim();
+  const t = await (await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      code: String(code), client_id: clientId, client_secret: secret,
+      redirect_uri: gRedirectUri(), grant_type: 'authorization_code',
+    }),
+  })).json();
+  if (t.error || !t.access_token) throw new Error('Troca com o Google falhou.');
+  return t;
+}
+
+// Login por redirect (público: sem JWT ainda). Sem popup branco do GIS.
+r.get('/google/login/start', (req, res) => {
+  const clientId = (process.env.GOOGLE_CLIENT_ID || '').trim();
+  const secret = (process.env.GOOGLE_CLIENT_SECRET || '').trim();
+  if (!clientId || !secret) return res.status(400).json({ error: 'Falta GOOGLE_CLIENT_ID/SECRET no servidor.' });
+  const nonce = randomUUID();
+  gNonces.set(nonce, { userId: '', scope: 'login', exp: Date.now() + 10 * 60 * 1000 });
+  const u = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+  u.searchParams.set('client_id', clientId);
+  u.searchParams.set('redirect_uri', gRedirectUri());
+  u.searchParams.set('response_type', 'code');
+  u.searchParams.set('scope', G_SCOPES.login);
+  u.searchParams.set('access_type', 'online');
+  u.searchParams.set('prompt', 'select_account');
+  u.searchParams.set('state', nonce);
+  return res.redirect(u.toString());
+});
+
+// Ticket de uso único -> JWT (front troca sem expor nada na URL além do ticket).
+r.post('/google/consume', loginLimiter, (req, res) => {
+  try {
+    const t = gTickets.get(String(req.body?.ticket || ''));
+    gTickets.delete(String(req.body?.ticket || ''));
+    if (!t || Date.now() > t.exp) return res.status(400).json({ error: 'Sessão expirada. Tente de novo.' });
+    const u = findById(t.userId);
+    if (!u) return res.status(404).json({ error: 'Conta sumiu.' });
+    return res.json({ user: publicUser(u), token: signToken(u) });
+  } catch (e) { return res.status(400).json({ error: e.message }); }
+});
+
 r.get('/google/callback', async (req, res) => {
   const front = String(process.env.PUBLIC_URL || 'http://localhost:4000').replace(/\/$/, '');
   const back = (msg, kind = 'erro') => res.redirect(`${front}/?import=${kind}&msg=${encodeURIComponent(msg)}`);
   try {
     const { code, state, error } = req.query || {};
-    if (error) return back('Permissão negada no Google.');
+    if (error) {
+      const n0 = gNonces.get(String(state || ''));
+      gNonces.delete(String(state || ''));
+      if (n0?.scope === 'login') return res.redirect(`${front}/?glogin=cancel`);
+      return back('Permissão negada no Google.');
+    }
     const n = gNonces.get(String(state || ''));
     gNonces.delete(String(state || ''));
     if (!n || Date.now() > n.exp) return back('Sessão expirou. Tente de novo.');
     if (!code) return back('Sem código do Google.');
-    const clientId = (process.env.GOOGLE_CLIENT_ID || '').trim();
-    const secret = (process.env.GOOGLE_CLIENT_SECRET || '').trim();
-    const t = await (await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        code: String(code), client_id: clientId, client_secret: secret,
-        redirect_uri: gRedirectUri(), grant_type: 'authorization_code',
-      }),
-    })).json();
     // O code só vale p/ nosso client+redirect: sem vínculo trocado não há fraude.
+    const t = await exchangeCode(code);
+    if (n.scope === 'login') {
+      // Identidade via userinfo (access do login não guarda refresh).
+      const me = await (await fetch('https://openidconnect.googleapis.com/v1/userinfo', { headers: { Authorization: `Bearer ${t.access_token}` } })).json();
+      if (!me.email_verified || !me.email) return res.redirect(`${front}/?glogin=erro`);
+      const u = findOrCreateGoogle({ email: me.email, name: me.name, picture: me.picture, googleId: me.sub });
+      const ticket = randomUUID();
+      gTickets.set(ticket, { userId: u.id, exp: Date.now() + 5 * 60 * 1000 });
+      return res.redirect(`${front}/?glogin=${ticket}`);
+    }
     if (!t.access_token || !t.refresh_token) return back('Google não devolveu o vínculo.');
     linkRefresh(n.userId, { refreshToken: t.refresh_token, accessToken: t.access_token, scopes: String(t.scope || '').split(' ') });
     return res.redirect(`${front}/?import=${n.scope}`);

@@ -21,9 +21,9 @@
         <input id="u_email" class="inp" placeholder="E-mail" autocomplete="email" />
         <input id="u_pass" class="inp" type="password" placeholder="Senha" autocomplete="current-password" />
         <button onclick="Auth.login()" class="btn-big">Entrar</button>
-        <div class="flex gap-2 mt-2 text-xs"><span class="text-zinc-500">ou</span></div>
-        <div id="googleWrap" class="mt-2"><div id="googleBtn"></div></div>
-        <div class="flex gap-2 mt-2 text-xs">
+        <div class="sp-or"><span>ou</span></div>
+        <button onclick="Auth.googleLogin()" class="btn-google"><span class="g-logo">G</span> Fazer login com o Google</button>
+        <div class="flex gap-2 mt-2 text-xs auth-links">
           <button onclick="Auth.show('register')" class="sp-link">Criar conta</button>
           <button onclick="Auth.show('forgot')" class="sp-link">Esqueci a senha</button>
         </div>
@@ -89,22 +89,11 @@
             <button class="sp-nav-btn" data-view="planos" onclick="Shell.show('planos')">💎 <span class="side-label">Planos</span></button>
             <button class="sp-nav-btn" data-view="import" onclick="Shell.show('import')">📥 <span class="side-label">Importar</span></button>
             <button class="sp-nav-btn" data-view="playlists" onclick="Shell.show('playlists')">🎶 <span class="side-label">Playlists</span></button>
+            <button class="sp-nav-btn" data-view="profiles" onclick="Shell.show('profiles')">👤 <span class="side-label">Perfis</span></button>
             <button class="sp-nav-btn" data-view="trash" onclick="Shell.show('trash')">🗑 <span class="side-label">Lixeira</span></button>
             <button class="sp-nav-btn" data-view="vault" onclick="Shell.show('vault')">🔒 <span class="side-label">Cofre</span></button>
             <button class="sp-nav-btn" data-view="admin" id="navAdmin" onclick="Shell.show('admin')" hidden>⚙ <span class="side-label">Admin</span></button>
           </nav>
-        </div>
-        <div class="sp-side-foot">
-          <div class="sp-quota-mini">
-            <div class="flex justify-between text-xs text-zinc-400"><span>Espaço</span><span id="qUseMini">–</span></div>
-            <div class="sp-bar"><div id="qBarMini" style="width:0%"></div></div>
-          </div>
-          <div class="sp-foot-row">
-            <button class="sp-foot-btn" onclick="Shell.show('system')" title="Minha conta e uso">⚙ Conta</button>
-            <button class="sp-foot-btn" onclick="Shell.show('planos')" title="Ver planos">💎 Planos</button>
-            <button class="sp-foot-btn" onclick="Auth.logout()" title="Sair">↩ Sair</button>
-          </div>
-          <div class="sp-ver">Deploy Center v10</div>
         </div>
       </div>
     </aside>
@@ -114,6 +103,7 @@
       <header class="sp-topbar">
         <div class="sp-topbar-left">
           <input id="search" class="sp-search" placeholder="O que você quer ouvir ou buscar? 🔍" oninput="Search.onInput(this.value)" />
+          <button class="sp-top-exit" onclick="Auth.logout()" title="Sair">↩</button>
         </div>
       </header>
       <div id="viewHost"></div>
@@ -139,7 +129,11 @@
         <button id="pToggle" onclick="Player.toggle()" class="sp-play-btn" title="Play/Pause">⏸</button>
         <button onclick="Player.next()" title="Próxima">⏭</button>
       </div>
-      <audio id="audio" class="sp-p-audio" controls preload="metadata"></audio>
+      <div class="sp-p-track" id="pTrack" onclick="Player.seek(event)">
+        <div class="sp-p-fill" id="pFill"></div>
+      </div>
+      <div class="sp-p-times"><span id="pCur">0:00</span><span id="pDur">0:00</span></div>
+      <audio id="audio" preload="metadata" hidden></audio>
     </div>
     <div class="sp-player-right"><button onclick="Player.close()" class="sp-p-close" title="Fechar">✕</button></div>
   </footer>

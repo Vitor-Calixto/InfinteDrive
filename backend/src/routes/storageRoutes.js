@@ -140,7 +140,8 @@ r.get('/quota', (req, res) => {
 // Express trata Range automaticamente no sendFile (seek do player).
 r.get('/download/:id', (req, res) => {
   const meta = assertOwner(getFileMeta(req.params.id), req.user);
-  if (!meta || meta.trashedAt) return res.status(404).json({ error: 'Arquivo não encontrado.' });
+  if (!meta) return res.status(404).json({ error: 'Arquivo não encontrado.' });
+  // Lixeira: dono pode pré-visualizar (só leitura); link público continua 404.
   // Cofre trancado: nem download direto pelo id (só admin passa).
   if (req.user.role !== 'admin' && meta.vaultId && isVaultLocked(meta.ownerId, meta.vaultId)) {
     return res.status(404).json({ error: 'Arquivo não encontrado.' });
@@ -166,7 +167,7 @@ r.get('/download/:id', (req, res) => {
 // Mesmo isolamento do download: dono ou admin, 404 genérico.
 r.get('/thumb/:id', (req, res) => {
   const meta = assertOwner(getFileMeta(req.params.id), req.user);
-  if (!meta || !meta.thumb || meta.trashedAt) return res.status(404).json({ error: 'Arquivo não encontrado.' });
+  if (!meta || !meta.thumb) return res.status(404).json({ error: 'Arquivo não encontrado.' });
   if (req.user.role !== 'admin' && meta.vaultId && isVaultLocked(meta.ownerId, meta.vaultId)) {
     return res.status(404).json({ error: 'Arquivo não encontrado.' });
   }
@@ -255,6 +256,33 @@ r.delete('/broken/all', (req, res) => {
   }
   appendAudit({ userId: req.user.id, action: 'empty-broken', ip: req.ip, detail: `${mine.length} quebrado(s)` });
   return res.json({ ok: true, removed: mine.length });
+});
+
+// POST /api/storage/trash/many { ids: [] } — manda um lote MEU pra lixeira.
+r.post('/trash/many', (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids.slice(0, 2000) : [];
+  let n = 0;
+  for (const id of ids) {
+    const meta = assertOwner(getFileMeta(id), req.user);
+    if (!meta || meta.trashedAt) continue;
+    meta.trashedAt = new Date().toISOString();
+    upsertRow('storage', meta);
+    dropIndex(meta.id);
+    n++;
+  }
+  appendAudit({ userId: req.user.id, action: 'trash-many', ip: req.ip, detail: `${n} arquivo(s)` });
+  return res.json({ ok: true, trashed: n });
+});
+
+// POST /api/storage/trash/restore-all — restaura MINHA lixeira inteira.
+r.post('/trash/restore-all', (req, res) => {
+  const mine = readCollection('storage').filter((m) => m.ownerId === req.user.id && m.trashedAt);
+  for (const meta of mine) {
+    delete meta.trashedAt;
+    upsertRow('storage', meta);
+  }
+  appendAudit({ userId: req.user.id, action: 'restore-all', ip: req.ip, detail: `${mine.length} arquivo(s)` });
+  return res.json({ ok: true, restored: mine.length });
 });
 
 // DELETE /api/storage/trash/empty — esvazia MINHA lixeira.

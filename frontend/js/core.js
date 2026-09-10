@@ -53,6 +53,19 @@ function toast(msg) {
   t._h = setTimeout(() => { t.style.display = 'none'; }, 5000);
 }
 window.addEventListener('error', (e) => toast('Erro: ' + (e.message || 'falha')));
+// Mídia (thumb/foto) que falha pode ser sessão morta (401 silencioso:
+// <img> não mostra toast). Confere 1x e derruba pro login se for isso.
+let _mediaAuthCheck = 0;
+window.addEventListener('error', async (e) => {
+  const t = e.target;
+  if (!t || !(t instanceof HTMLImageElement) || !/storage\/(thumb|download)/.test(t.src || '')) return;
+  if (Date.now() - _mediaAuthCheck < 30000) return;
+  _mediaAuthCheck = Date.now();
+  try {
+    const r = await fetch(api() + '/auth/me', { headers: authHeaders() });
+    if (r.status === 401 && window.Auth?.lost) { Auth.lost(); toast('Sessão expirou. Entre de novo.'); }
+  } catch {}
+}, true);
 function inputDlg(msg, { placeholder = '', password = false, value = '' } = {}) {
   return new Promise((resolve) => {
     $('inputMsg').textContent = msg;

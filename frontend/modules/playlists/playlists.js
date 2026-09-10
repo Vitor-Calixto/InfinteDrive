@@ -13,7 +13,13 @@ const Playlists = (() => {
   function get(id) { return all.find((p) => p.id === id); }
   function paintNav() {
     const nav = $('playNav'); if (!nav) return;
-    nav.innerHTML = all.map((p) => `<button class="sp-nav-btn" onclick="Drive.setPlaylist('${p.id}');Shell.show('drive')">${p.locked ? '🔒' : '📁'} ${esc(p.name)} <span class="text-zinc-500">· ${p.count ?? (p.fileIds||[]).length}</span></button>`).join('');
+    // Perfil ativo filtra: só as playlists dele (+ as da conta, profileId vazio).
+    let list = all;
+    try {
+      const cur = window.Profiles?.current?.();
+      if (cur) list = all.filter((p) => !p.profileId || p.profileId === cur);
+    } catch {}
+    nav.innerHTML = list.map((p) => `<button class="sp-nav-btn" onclick="Drive.setPlaylist('${p.id}');Shell.show('drive')">${p.locked ? '🔒' : '📁'} ${esc(p.name)} <span class="text-zinc-500">· ${p.count ?? (p.fileIds||[]).length}</span></button>`).join('');
   }
   async function create() {
     const name = await inputDlg('Nome da playlist:', { placeholder: 'Viagem 2026' });
@@ -73,6 +79,7 @@ const Playlists = (() => {
           <div class="pl-sub">${tracks.length} faixa(s)</div>
           <div class="pl-actions">
             ${audios.length ? `<button class="btn-ghost" onclick="Playlists.playAll('${id}')">▶ Tocar</button>` : ''}
+            <button class="btn-ghost" onclick="Playlists.addFiles('${id}')">＋ Adicionar arquivos</button>
             <button class="btn-ghost" onclick="Playlists.setCover('${id}')">📷 Capa</button>
             <button class="btn-ghost" onclick="Playlists.remove('${id}')">🗑 Excluir</button>
           </div>
@@ -136,6 +143,10 @@ const Playlists = (() => {
     };
     i.click();
   }
-  return { refresh, get, all: () => all, create, show, open, playTrack, playAll, unlist, remove, setCover, coverUrl };
+  function addFiles(pid) {
+    Drive.addMode(pid);
+    Shell.show('drive');
+  }
+  return { refresh, get, all: () => all, create, show, open, playTrack, playAll, unlist, remove, setCover, addFiles, coverUrl, paintNav };
 })();
 window.Playlists = Playlists;

@@ -4,11 +4,14 @@ const Share = (() => {
   let shareUrl = '';
   async function open(id) {
     openId = id; shareUrl = '';
-    const f = (window._files || []).find((x) => x.id === id);
+    const f = (window._files || []).find((x) => x.id === id)
+      || (window._trash || []).find((x) => x.id === id);
     if (!f) return;
     const k = kindOf(f);
     if (k === 'audio') {
-      Player.playList((window._files || []).filter((x) => kindOf(x) === 'audio'), id);
+      // Da lixeira: toca só ele (não entra na fila do drive).
+      const pool = f.trashedAt ? [f] : (window._files || []).filter((x) => kindOf(x) === 'audio');
+      Player.playList(pool, id);
       return;
     }
     const body = $('modalBody');

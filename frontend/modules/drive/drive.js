@@ -77,6 +77,27 @@ const Drive = (() => {
     searchTerm = ''; serverIds = null;
     const si = $('search'); if (si) si.value = '';
   }
+  // Modo adicionar: da página da playlist, escolhe arquivos no drive.
+  let addPid = '';
+  function addMode(pid) {
+    addPid = pid || '';
+    const pl = pid ? Playlists.get(pid) : null;
+    const b = $('addBanner');
+    if (b) {
+      b.hidden = !pid;
+      if (pid) b.innerHTML = `＋ Adicionando em <b>${esc(pl?.name || 'playlist')}</b> — toque ＋ nos arquivos. <button class="sp-link" onclick="Drive.addMode('')">concluir</button>`;
+    }
+    render();
+  }
+  async function addOne(pid, fid) {
+    try {
+      await jpost(`/playlists/${pid}/files`, { fileIds: [fid] });
+      await Playlists.refresh();
+      const ok = (Playlists.get(pid)?.fileIds || []).includes(fid);
+      toast(ok ? 'Adicionado. ✅' : 'Erro: servidor não confirmou.');
+      render();
+    } catch (e) { toast('Erro: ' + e.message); }
+  }
   function filterKind(k) {
     kindFilter = k; playlistFilter = '';
     clearSearchInput();
@@ -166,6 +187,7 @@ const Drive = (() => {
         ${!f.broken ? pendLine(f) : ''}
         ${f.snippet ? `<div class="sp-album-snippet">…${esc(f.snippet)}…</div>` : ''}
         <div class="sp-album-row">
+          ${addPid ? `<button class="btn-ghost icon" title="Adicionar na playlist" onclick="event.stopPropagation();Drive.addOne('${addPid}','${f.id}')">＋</button>` : ''}
           <button class="btn-ghost icon" title="Mover pra lixeira" onclick="event.stopPropagation();Drive.del('${f.id}')">${ICO_TRASH}</button>
           <button class="btn-ghost icon" title="Enviar" onclick="event.stopPropagation();Drive.sendFile('${f.id}')">${ICO_SEND}</button>
           <button class="btn-ghost icon" title="Copiar link" onclick="event.stopPropagation();Drive.copyLink('${f.id}')">${ICO_COPY}</button>
@@ -242,11 +264,15 @@ const Drive = (() => {
         await Vault.unlock(pid); // pede a senha do cofre
         await Playlists.refresh();
         pl = Playlists.get(pid);
-        if (!pl || pl.locked) return; // errou/cancelou a senha
+        if (!pl || pl.locked) return toast('Cofre continua trancado — nada movido. 🔒');
       }
+      const f = allFiles.find((x) => x.id === fid);
       await jpost(`/playlists/${pid}/files`, { fileIds: [fid] });
+      // Confere de verdade: relê e garante o arquivo lá dentro.
       await Playlists.refresh();
-      toast(`Na playlist ${pl.name}. ✅`);
+      const ok = (Playlists.get(pid)?.fileIds || []).includes(fid);
+      if (!ok) throw new Error('servidor não confirmou. Tente de novo.');
+      toast(`"${f?.name || 'Arquivo'}" na playlist ${pl.name}. ✅`);
     } catch (e) { toast('Erro: ' + e.message); }
   }
   async function moveNew(fid) {
@@ -352,6 +378,16 @@ const Drive = (() => {
     if (!await confirmDlg('Mover para a lixeira?')) return;
     try { await jdel('/storage/' + id); refresh(); } catch (e) { toast(e.message); }
   }
+  async function cleanAll() {
+    const list = visible();
+    if (!list.length) return toast('Nada visível pra excluir.');
+    if (!await confirmDlg(`Mover ${list.length} arquivo(s) visível(is) pra lixeira? (30 dias pra restaurar)`)) return;
+    try {
+      const r = await jpost('/storage/trash/many', { ids: list.map((f) => f.id) });
+      toast(`🗑 ${r.trashed} na lixeira.`);
+      refresh();
+    } catch (e) { toast('Erro: ' + e.message); }
+  }
   async function cleanBroken() {
     const n = allFiles.filter((f) => f.broken && !f.trashedAt).length;
     if (!n) return toast('Nenhum quebrado por aqui. 🎉');
@@ -372,6 +408,6 @@ const Drive = (() => {
       try { window.Upload?.watchProcessing?.(); } catch {}
     } catch (e) { toast('Erro: ' + e.message); }
   }
-  return { show, refresh, renderMock, refreshQuota, filterKind, setSearch, setServerResults, setSort, setPlaylist, render, del, cleanBroken, recompress, openFile, menu, menuBack, moveMenu, moveTo, moveNew, toggleStar, vaultMove, vaultNew, rename, download, offline, copyLink, sendFile, thumbUrl, dlUrl, icon, visible: () => visible(), all: () => allFiles };
+  return { show, refresh, renderMock, refreshQuota, filterKind, setSearch, setServerResults, setSort, setPlaylist, render, del, cleanAll, cleanBroken, recompress, openFile, menu, menuBack, moveMenu, moveTo, moveNew, toggleStar, vaultMove, vaultNew, rename, download, offline, copyLink, sendFile, addMode, addOne, thumbUrl, dlUrl, icon, visible: () => visible(), all: () => allFiles };
 })();
 window.Drive = Drive;
