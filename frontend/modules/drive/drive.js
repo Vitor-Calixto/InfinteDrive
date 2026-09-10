@@ -150,29 +150,217 @@ const Drive = (() => {
     const grid = $('filesGrid');
     if (!grid) return;
     const list = visible();
+    const c = $('fileCount');
+    if (c) {
+      const total = allFiles.filter((f) => !f.trashedAt).length;
+      c.textContent = list.length === total ? `${total} arquivo(s)` : `${list.length} de ${total}`;
+    }
     grid.innerHTML = list.map((f) => `
       <div class="sp-album" onclick="Share.open('${f.id}')" title="${esc(f.name)}">
         ${f.thumb ? `<img src="${thumbUrl(f.id)}" loading="lazy" />` : `<div class="sp-album-fallback">${icon(f)}</div>`}
+        <button class="sp-album-more" title="Mais ações" onclick="event.stopPropagation();Drive.menu('${f.id}',event)">⋮</button>
         <button class="sp-album-play" onclick="event.stopPropagation();Share.open('${f.id}')">▶</button>
         <div class="sp-album-title">${esc(f.name)}</div>
         <div class="sp-album-sub">${fmtMB((f.sizeOrig || 0) / 1048576)} → ${fmtMB((f.sizeFinal ?? f.sizeOrig) / 1048576)}${f.duration ? ' · ' + fmtDur(f.duration) : ''}</div>
-        ${pendLine(f)}
+        ${f.broken ? `<div class="sp-album-broken" title="${esc(f.note || 'Sem conteúdo')}">⚠️ quebrado na origem</div>` : ''}
+        ${!f.broken ? pendLine(f) : ''}
         ${f.snippet ? `<div class="sp-album-snippet">…${esc(f.snippet)}…</div>` : ''}
         <div class="sp-album-row">
-          ${f.compressed && (kindOf(f) === 'video' || kindOf(f) === 'audio' || kindOf(f) === 'image') ? `<button class="btn-ghost" title="Comprimir de novo (config atual)" onclick="event.stopPropagation();Drive.recompress('${f.id}')">♻</button>` : ''}
-          <button class="btn-ghost" onclick="event.stopPropagation();Drive.menu('${f.id}',event)">⋮</button>
+          <button class="btn-ghost icon" title="Mover pra lixeira" onclick="event.stopPropagation();Drive.del('${f.id}')">${ICO_TRASH}</button>
+          <button class="btn-ghost icon" title="Enviar" onclick="event.stopPropagation();Drive.sendFile('${f.id}')">${ICO_SEND}</button>
+          <button class="btn-ghost icon" title="Copiar link" onclick="event.stopPropagation();Drive.copyLink('${f.id}')">${ICO_COPY}</button>
         </div>
       </div>`).join('') || (searchTerm || serverIds !== null || playlistFilter
         ? '<span class="text-zinc-500 text-xs">Nada achado. Limpe a busca ou troque o filtro. 🔍</span>'
         : '<span class="text-zinc-500 text-xs">Nada aqui ainda. Arraste arquivos acima. ⬆</span>');
   }
-  function menu(id, ev) {
+  // Ícones SVG (emoji 🗑 vira ⬛ em Windows sem fonte colorida).
+  const ICO_TRASH = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>';
+  const ICO_SEND = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>';
+  const ICO_COPY = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
+  const STAR = '⭐ Favoritas';
+
+  function closeMenus() { document.getElementById('cardmenu')?.remove(); }
+  async function menu(id, ev) {
     ev?.stopPropagation();
-    Share.open(id);
+    closeMenus();
+    const f = allFiles.find((x) => x.id === id);
+    if (!f) return;
+    const m = document.createElement('div');
+    m.className = 'sp-menu card-menu';
+    m.id = 'cardmenu';
+    m.style.left = Math.max(8, Math.min(ev.clientX || 0, window.innerWidth - 240)) + 'px';
+    m.style.top = Math.max(8, Math.min(ev.clientY || 0, window.innerHeight - 320)) + 'px';
+    m.innerHTML = '<div class="sp-menu-title">carregando…</div>';
+    document.body.appendChild(m);
+    setTimeout(() => document.addEventListener('click', closeMenus, { once: true }), 0);
+    await paintMain(m, id);
+  }
+  async function paintMain(m, id) {
+    const f = allFiles.find((x) => x.id === id);
+    if (!f || !document.getElementById('cardmenu')) return;
+    try {
+      await Playlists.refresh();
+      const starPl = Playlists.all().find((p) => p.name === STAR);
+      const starred = starPl && (starPl.fileIds || []).includes(id);
+      const k = kindOf(f);
+      m.innerHTML = `
+        <div class="sp-menu-title">${esc((f.name || '').slice(0, 30))}</div>
+        <button onclick="Drive.rename('${id}')">✏️ Renomear</button>
+        <button onclick="Drive.download('${id}')">⬇️ Baixar</button>
+        <button onclick="Drive.moveMenu('${id}')">📁 Mover p/ playlist…</button>
+        <button onclick="Drive.toggleStar('${id}')">${starred ? '☆ Tirar estrela' : '⭐ Favoritar'}</button>
+        <button onclick="Drive.vaultMove('${id}')">🔒 Pasta trancada…</button>
+        <button onclick="Drive.offline('${id}')">📴 Deixar offline</button>
+        ${(k === 'video' || k === 'audio' || k === 'image') && f.compressed ? `<button onclick="Drive.recompress('${id}')">♻ Comprimir mais</button>` : ''}`;
+    } catch (e) { m.innerHTML = '<div class="sp-menu-title">Erro: ' + esc(e.message) + '</div>'; }
+  }
+  async function moveMenu(id) {
+    const m = document.getElementById('cardmenu');
+    const f = allFiles.find((x) => x.id === id);
+    if (!m || !f) return;
+    try {
+      await Playlists.refresh();
+      const pls = Playlists.all();
+      m.innerHTML = `<div class="sp-menu-title">Mover para…</div>` +
+        (pls.map((p) => `<button onclick="Drive.moveTo('${p.id}','${id}')">${p.locked ? '🔒' : '📁'} ${esc(p.name)}</button>`).join('') || '<div class="sp-menu-title">sem playlists</div>') +
+        `<button onclick="Drive.moveNew('${id}')">＋ Nova playlist</button>
+         <button onclick="Drive.menuBack('${id}')">‹ Voltar</button>`;
+    } catch (e) { m.innerHTML = '<div class="sp-menu-title">Erro: ' + esc(e.message) + '</div>'; }
+  }
+  async function menuBack(id) {
+    const m = document.getElementById('cardmenu');
+    if (m) await paintMain(m, id);
+  }
+  async function moveTo(pid, fid) {
+    closeMenus();
+    try {
+      await Playlists.refresh();
+      let pl = Playlists.get(pid);
+      if (!pl) return toast('Playlist sumiu. Atualize.');
+      if (pl.locked) {
+        await Vault.unlock(pid); // pede a senha do cofre
+        await Playlists.refresh();
+        pl = Playlists.get(pid);
+        if (!pl || pl.locked) return; // errou/cancelou a senha
+      }
+      await jpost(`/playlists/${pid}/files`, { fileIds: [fid] });
+      await Playlists.refresh();
+      toast(`Na playlist ${pl.name}. ✅`);
+    } catch (e) { toast('Erro: ' + e.message); }
+  }
+  async function moveNew(fid) {
+    closeMenus();
+    const name = await inputDlg('Nome da nova playlist:', { placeholder: 'Viagem 2026' });
+    if (!name?.trim()) return;
+    try {
+      const pl = await jpost('/playlists', { name: name.trim() });
+      await Playlists.refresh();
+      await moveTo(pl.id, fid);
+    } catch (e) { toast('Erro: ' + e.message); }
+  }
+  async function toggleStar(fid) {
+    closeMenus();
+    try {
+      await Playlists.refresh();
+      let pl = Playlists.all().find((p) => p.name === STAR);
+      if (pl && (pl.fileIds || []).includes(fid)) {
+        await jdel(`/playlists/${pl.id}/files/${fid}`);
+        toast('☆ Tirada das favoritas.');
+      } else {
+        if (!pl) pl = await jpost('/playlists', { name: STAR });
+        await jpost(`/playlists/${pl.id}/files`, { fileIds: [fid] });
+        toast('⭐ Nas favoritas!');
+      }
+      await Playlists.refresh();
+      render();
+    } catch (e) { toast('Erro: ' + e.message); }
+  }
+  async function vaultMove(fid) {
+    const m = document.getElementById('cardmenu');
+    if (!m) return;
+    try {
+      await Playlists.refresh();
+      const locked = Playlists.all().filter((p) => p.vault);
+      m.innerHTML = `<div class="sp-menu-title">Pasta trancada…</div>` +
+        locked.map((p) => `<button onclick="Drive.moveTo('${p.id}','${fid}')">🔒 ${esc(p.name)}</button>`).join('') +
+        `<button onclick="Drive.vaultNew('${fid}')">＋ Nova trancada</button>
+         <button onclick="Drive.menuBack('${fid}')">‹ Voltar</button>`;
+    } catch (e) { m.innerHTML = '<div class="sp-menu-title">Erro: ' + esc(e.message) + '</div>'; }
+  }
+  async function vaultNew(fid) {
+    closeMenus();
+    const name = await inputDlg('Nome da pasta trancada:', { placeholder: 'Pessoal' });
+    if (!name?.trim()) return;
+    const pw = await inputDlg('Senha (4+ caracteres):', { password: true });
+    if (!pw || pw.length < 4) return toast('Senha curta demais.');
+    try {
+      const pl = await jpost('/playlists', { name: name.trim() });
+      await jpost(`/playlists/${pl.id}/vault`, { password: pw });
+      await jpost(`/playlists/${pl.id}/unlock`, { password: pw });
+      await jpost(`/playlists/${pl.id}/files`, { fileIds: [fid] });
+      await Playlists.refresh();
+      refresh();
+      toast('🔒 Guardado no cofre.');
+    } catch (e) { toast('Erro: ' + e.message); }
+  }
+  async function rename(id) {
+    closeMenus();
+    const f = allFiles.find((x) => x.id === id);
+    if (!f) return;
+    const name = await inputDlg('Novo nome:', { value: f.name || '' });
+    if (!name || !name.trim() || name.trim() === f.name) return;
+    try {
+      await fetch(api() + `/storage/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ name: name.trim() }) }).then(async (r) => { if (!r.ok) throw new Error(await r.text()); });
+      refresh();
+      toast('Renomeado. ✅');
+    } catch (e) { toast('Erro: ' + e.message); }
+  }
+  function download(id) {
+    closeMenus();
+    const a = document.createElement('a');
+    a.href = dlUrl(id);
+    a.download = '';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+  function offline(id) {
+    download(id);
+    toast('📴 Baixando pro aparelho — fica disponível offline.');
+  }
+  async function copyLink(id) {
+    try {
+      const r = await jpost('/share/' + id, {});
+      let url = r.url || '';
+      if (url.startsWith('/')) url = location.origin + url;
+      await navigator.clipboard.writeText(url);
+      toast('Link copiado. Vale 7 dias. 🔗');
+    } catch (e) { toast('Erro: ' + e.message); }
+  }
+  async function sendFile(id) {
+    try {
+      const r = await jpost('/share/' + id, {});
+      let url = r.url || '';
+      if (url.startsWith('/')) url = location.origin + url;
+      const f = allFiles.find((x) => x.id === id);
+      if (navigator.share) await navigator.share({ title: f?.name || 'Arquivo', text: f?.name || '', url }).catch(() => {});
+      else { await navigator.clipboard.writeText(url); toast('Link copiado. Vale 7 dias.'); }
+    } catch (e) { toast('Erro: ' + e.message); }
   }
   async function del(id) {
     if (!await confirmDlg('Mover para a lixeira?')) return;
     try { await jdel('/storage/' + id); refresh(); } catch (e) { toast(e.message); }
+  }
+  async function cleanBroken() {
+    const n = allFiles.filter((f) => f.broken && !f.trashedAt).length;
+    if (!n) return toast('Nenhum quebrado por aqui. 🎉');
+    if (!await confirmDlg(`${n} vídeo(s) sem conteúdo vão pra lixeira. Reimporte os originais depois. Continuar?`)) return;
+    try {
+      const r = await jdel('/storage/broken/all');
+      toast(`🧹 ${r.removed} pra lixeira.`);
+      refresh();
+    } catch (e) { toast('Erro: ' + e.message); }
   }
   function openFile(id) { Share.open(id); }
   async function recompress(id) {
@@ -184,6 +372,6 @@ const Drive = (() => {
       try { window.Upload?.watchProcessing?.(); } catch {}
     } catch (e) { toast('Erro: ' + e.message); }
   }
-  return { show, refresh, renderMock, refreshQuota, filterKind, setSearch, setServerResults, setSort, setPlaylist, render, del, recompress, openFile, thumbUrl, dlUrl, icon, visible: () => visible(), all: () => allFiles };
+  return { show, refresh, renderMock, refreshQuota, filterKind, setSearch, setServerResults, setSort, setPlaylist, render, del, cleanBroken, recompress, openFile, menu, menuBack, moveMenu, moveTo, moveNew, toggleStar, vaultMove, vaultNew, rename, download, offline, copyLink, sendFile, thumbUrl, dlUrl, icon, visible: () => visible(), all: () => allFiles };
 })();
 window.Drive = Drive;

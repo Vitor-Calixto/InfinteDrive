@@ -134,11 +134,45 @@ function runFfmpegProgress(args, timeoutMs, totalSec, onPct) {
   });
 }
 
-async function compressVideo(abs, meta) {
+// Duração autoritativa: music-metadata (rápido) cai p/ ffmpeg (transcodificador).
+// Toco típico: mm dá undefined (sem samples) e o ffmpeg acusa 0.03s.
+async function probeDuration(abs) {
   try {
     const info = await mm.parseFile(abs, { duration: true });
-    if (info.format.duration) meta.duration = Math.round(info.format.duration);
-  } catch { /* duração opcional */ }
+    if (Number.isFinite(info.format.duration)) return info.format.duration;
+  } catch {}
+  try {
+    const err = await new Promise((resolve) => {
+      const p = spawn(ffmpegStatic, ['-hide_banner', '-i', abs], { stdio: ['ignore', 'pipe', 'pipe'] });
+      let out = '';
+      p.stderr.on('data', (d) => { out += d.toString(); if (out.length > 8000) out = out.slice(-8000); });
+      p.on('close', () => resolve(out));
+      p.on('error', () => resolve(''));
+      setTimeout(() => { try { p.kill('SIGKILL'); } catch {} }, 15000);
+    });
+    const m = /Duration:\s*(\d+):(\d+):([\d.]+)/.exec(err);
+    if (m) return Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]);
+  } catch {}
+  return undefined;
+}
+
+// Vídeo-toco (header sem dados: 0.03s, 2KB): veio quebrado da origem.
+// Marca e pula o ffmpeg (economiza CPU); o front sinaliza em vez de player preto.
+function markBroken(meta, why) {
+  meta.broken = true;
+  meta.compressed = true;
+  meta.note = why;
+  delete meta.progress;
+  upsertRow('storage', meta);
+  appendAudit({ userId: meta.ownerId, action: 'compress', fileId: meta.id, detail: `quebrado na origem: ${why}` });
+}
+async function compressVideo(abs, meta) {
+  const dur = await probeDuration(abs);
+  if (dur !== undefined) meta.duration = Math.round(dur);
+  if ((dur !== undefined && dur < 1) || (meta.sizeOrig || 0) < 2048) {
+    markBroken(meta, `sem conteúdo (${dur !== undefined ? dur.toFixed(2) + 's' : '?s'}, ${Math.round((meta.sizeOrig || 0) / 1024)}KB)`);
+    return { saved: 0 };
+  }
   const dir = userRoot(meta.ownerId);
   // Terminal .mp4 de propósito: ffmpeg detecta o formato pela extensão.
   const out = safeJoin(dir, `${meta.id}.new.mp4`);
@@ -322,12 +356,39 @@ function takeNext() {
   return job;
 }
 
+// Varredura 1x: vídeos pequenos antigos sem duração checada (só lê header, rápido).
+export async function sweepBroken() {
+  try {
+    const cands = readCollection('storage').filter((m) =>
+      String(m.mime || '').startsWith('video/') && !m.trashedAt && !m.broken && !m.brokenChecked &&
+      (Number(m.sizeFinal ?? m.sizeOrig) || 0) < 100 * 1024);
+    let n = 0;
+    for (const m of cands) {
+      try {
+        const abs = safeJoin(userRoot(m.ownerId), `${m.id}.bin`);
+        if (!fs.existsSync(abs)) { m.brokenChecked = true; upsertRow('storage', m); continue; }
+        const dur = await probeDuration(abs);
+        if (dur !== undefined) m.duration = Math.round(dur);
+        if ((dur !== undefined && dur < 1) || (m.sizeOrig || 0) < 2048) {
+          markBroken(m, `sem conteúdo (${dur !== undefined ? dur.toFixed(2) + 's' : '?s'})`);
+          n++;
+        } else {
+          m.brokenChecked = true;
+          upsertRow('storage', m);
+        }
+      } catch { try { m.brokenChecked = true; upsertRow('storage', m); } catch {} }
+    }
+    if (n) console.log(`[compress] ${n} vídeo(s) quebrado(s) na origem sinalizados.`);
+  } catch {}
+}
+
 export function startWorker(intervalMs = 15000) {
   const t = setInterval(() => processQueue().catch(() => {}), intervalMs);
   if (t.unref) t.unref();
   reconcileQueue();
   processQueue().catch(() => {});
   backfillPdfIndex().catch(() => {}); // PDFs antigos entram na busca sem reupload
+  sweepBroken().catch(() => {}); // tocos antigos ganham badge sem reupload
   return () => clearInterval(t);
 }
 

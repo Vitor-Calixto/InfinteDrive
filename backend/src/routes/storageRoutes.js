@@ -245,6 +245,18 @@ r.delete('/:id/forever', (req, res) => {
   return res.json({ ok: true });
 });
 
+// DELETE /api/storage/broken/all — manda p/ lixeira meus vídeos sem conteúdo.
+r.delete('/broken/all', (req, res) => {
+  const mine = readCollection('storage').filter((m) => m.ownerId === req.user.id && m.broken && !m.trashedAt);
+  for (const meta of mine) {
+    meta.trashedAt = new Date().toISOString();
+    upsertRow('storage', meta);
+    dropIndex(meta.id);
+  }
+  appendAudit({ userId: req.user.id, action: 'empty-broken', ip: req.ip, detail: `${mine.length} quebrado(s)` });
+  return res.json({ ok: true, removed: mine.length });
+});
+
 // DELETE /api/storage/trash/empty — esvazia MINHA lixeira.
 r.delete('/trash/empty', (req, res) => {
   const mine = readCollection('storage').filter((m) => m.ownerId === req.user.id && m.trashedAt);

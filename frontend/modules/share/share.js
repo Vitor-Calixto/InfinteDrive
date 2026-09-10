@@ -12,7 +12,9 @@ const Share = (() => {
       return;
     }
     const body = $('modalBody');
-    if (k === 'video') body.innerHTML = '<video src="' + Drive.dlUrl(id) + '" controls autoplay></video>';
+    if (f.broken) {
+      body.innerHTML = '<div class="sp-broken">⚠️<br>Arquivo sem conteúdo (' + esc(f.note || '0s') + ').<br><span>Veio quebrado da origem — reimporte o original.</span></div>';
+    } else if (k === 'video') body.innerHTML = '<video src="' + Drive.dlUrl(id) + '" controls autoplay playsinline></video>';
     else if (k === 'image') body.innerHTML = '<img src="' + Drive.dlUrl(id) + '" />';
     else { window.open(Drive.dlUrl(id), '_blank'); return; }
     $('modalCap').textContent = f.name;

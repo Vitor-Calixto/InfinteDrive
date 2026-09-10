@@ -1,0 +1,7 @@
+<h1 class="sp-greet">Playlists 🎶 <span id="plCount" class="text-xs text-zinc-400"></span></h1>
+<div class="flex gap-2 mb-2">
+  <button onclick="Playlists.create().then(()=>Playlists.show())" class="btn-ghost">＋ Nova playlist</button>
+  <button id="plBack" class="btn-ghost" hidden onclick="Playlists.show()">‹ Todas</button>
+</div>
+<div id="plGrid" class="sp-grid"></div>
+<div id="plDetail" hidden></div>
