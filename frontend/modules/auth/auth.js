@@ -90,6 +90,8 @@ const Auth = (() => {
     setLogged(true);
     window._user = user;
     try { window.Shell?.paintUser?.(user); } catch {}
+    const na = document.getElementById('navAdmin');
+    if (na) na.hidden = user?.role !== 'admin';
     try { Drive.refresh(); Profiles.refresh(); Playlists.refresh(); } catch (e) { console.warn(e); }
   }
   // Demo: shell visível + mocks pra validar sidebar, telas, player sem API.

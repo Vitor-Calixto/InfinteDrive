@@ -4,6 +4,11 @@ const Admin = (() => {
 
   async function show() {
     if (isDemo()) { paintDemo(); return; }
+    if (window._user && window._user.role !== 'admin') {
+      const box = $('usersBox');
+      if (box) box.innerHTML = '<span class="text-zinc-500 text-xs">Área do admin. Sua conta não tem acesso.</span>';
+      return;
+    }
     loadDisk();
   }
   function paintDemo() {

@@ -162,7 +162,9 @@ const Drive = (() => {
           ${f.compressed && (kindOf(f) === 'video' || kindOf(f) === 'audio' || kindOf(f) === 'image') ? `<button class="btn-ghost" title="Comprimir de novo (config atual)" onclick="event.stopPropagation();Drive.recompress('${f.id}')">♻</button>` : ''}
           <button class="btn-ghost" onclick="event.stopPropagation();Drive.menu('${f.id}',event)">⋮</button>
         </div>
-      </div>`).join('') || '<span class="text-zinc-500 text-xs">Nada aqui ainda. Arraste arquivos acima.</span>';
+      </div>`).join('') || (searchTerm || serverIds !== null || playlistFilter
+        ? '<span class="text-zinc-500 text-xs">Nada achado. Limpe a busca ou troque o filtro. 🔍</span>'
+        : '<span class="text-zinc-500 text-xs">Nada aqui ainda. Arraste arquivos acima. ⬆</span>');
   }
   function menu(id, ev) {
     ev?.stopPropagation();

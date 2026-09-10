@@ -71,5 +71,4 @@ server.on('error', (e) => {
 });
 server.listen(PORT, () => {
   console.log(`Deploy Center front em http://localhost:${PORT}/  (demo: ?demo=1)`);
-  console.log(`Login direto: http://localhost:${PORT}/pages/login/login.html`);
 });
