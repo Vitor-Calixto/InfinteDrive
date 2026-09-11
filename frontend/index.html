@@ -52,9 +52,7 @@
 
   <!-- SHELL -->
   <div class="sp-shell" id="appShell">
-    <!-- Aba fina na borda esquerda: aparece só com a barra escondida, 1 clique traz de volta -->
-    <button id="sideReopen" onclick="Shell.toggleSidebar(event)" title="Mostrar biblioteca">›</button>
-    <!-- SIDEBAR ÚNICA. Só existe esta. Nenhum outro painel lateral fullscreen. -->
+    <!-- SIDEBAR ÚNICA (overlay): abre/fecha pelo hambúrguer do topo. Sem aba lateral. -->
     <aside id="sidebar" class="sp-side" aria-label="Biblioteca">
       <!-- HAMBURGER DENTRO DA BARRA: visível sempre com ela aberta; fechada usa a aba › -->
       <button id="navToggle" class="sp-navtoggle" onclick="Shell.toggleSidebar(event)" title="Biblioteca — abrir / recolher" aria-label="Abrir ou recolher biblioteca"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="2" y1="4" x2="16" y2="4"/><line x1="2" y1="9" x2="16" y2="9"/><line x1="2" y1="14" x2="16" y2="14"/></svg></button>
@@ -102,6 +100,7 @@
     <main class="sp-main" id="main">
       <header class="sp-topbar">
         <div class="sp-topbar-left">
+          <button class="sp-hamburger" onclick="Shell.toggleSidebar(event)" title="Biblioteca — abrir / recolher" aria-label="Abrir ou recolher biblioteca"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="2" y1="4" x2="16" y2="4"/><line x1="2" y1="9" x2="16" y2="9"/><line x1="2" y1="14" x2="16" y2="14"/></svg></button>
           <input id="search" class="sp-search" placeholder="O que você quer ouvir ou buscar? 🔍" oninput="Search.onInput(this.value)" />
           <button class="sp-top-exit" onclick="Auth.logout()" title="Sair">↩</button>
         </div>

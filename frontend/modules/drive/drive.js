@@ -77,6 +77,106 @@ const Drive = (() => {
     searchTerm = ''; serverIds = null;
     const si = $('search'); if (si) si.value = '';
   }
+  // Multisseleção: marca vários cards e joga numa playlist de uma vez.
+  let selecting = false;
+  const selected = new Set();
+  function selectMode() {
+    selecting = !selecting;
+    selected.clear();
+    paintSelBanner();
+    render();
+  }
+  function toggleSelect(id) {
+    if (selected.has(id)) selected.delete(id);
+    else selected.add(id);
+    paintSelBanner();
+    render();
+  }
+  function paintSelBanner() {
+    const b = $('selBanner');
+    if (!b) return;
+    b.hidden = !selecting;
+    if (!selecting) return;
+    let opts = [];
+    try { opts = Playlists.all(); } catch {}
+    b.innerHTML = `☑ <b>${selected.size}</b> selecionado(s) — toque nos arquivos:
+      <span class="flex gap-2 mt-2" style="flex-wrap:wrap">
+      <select id="selPlaylist" class="inp" style="width:auto;margin:0">
+        <option value="">— playlist —</option>
+        ${opts.map((p) => `<option value="${p.id}">${p.locked ? '🔒' : '📁'} ${esc(p.name)}</option>`).join('')}
+      </select>
+      <button class="btn-ghost" onclick="Drive.addSelected()">＋ Playlist</button>
+      <button class="btn-ghost" onclick="Drive.dlSelected()">⬇ Baixar</button>
+      <button class="btn-ghost" onclick="Drive.copySelected()">🔗 Links</button>
+      <button class="btn-ghost" onclick="Drive.delSelected()">🗑 Excluir</button>
+      <button class="btn-ghost" onclick="Drive.selectMode()">✕ Sair</button>
+      </span>`;
+  }
+  function selFiles() {
+    const byId = new Map(allFiles.map((f) => [f.id, f]));
+    return [...selected].map((id) => byId.get(id)).filter(Boolean);
+  }
+  async function delSelected() {
+    const files = selFiles();
+    if (!files.length) return toast('Marque ao menos 1 arquivo.');
+    if (!await confirmDlg(`Mover ${files.length} pra lixeira? (30 dias pra restaurar)`)) return;
+    try {
+      const r = await jpost('/storage/trash/many', { ids: files.map((f) => f.id) });
+      toast(`🗑 ${r.trashed} na lixeira.`);
+      selecting = false;
+      selected.clear();
+      paintSelBanner();
+      refresh();
+    } catch (e) { toast('Erro: ' + e.message); }
+  }
+  async function dlSelected() {
+    const files = selFiles();
+    if (!files.length) return toast('Marque ao menos 1 arquivo.');
+    selecting = false;
+    selected.clear();
+    paintSelBanner();
+    render();
+    await DlQueue.start(files);
+  }
+  async function copySelected() {
+    const files = selFiles();
+    if (!files.length) return toast('Marque ao menos 1 arquivo.');
+    try {
+      toast('Gerando links…');
+      const lines = [];
+      for (const f of files) {
+        const r = await jpost('/share/' + f.id, {});
+        let url = r.url || '';
+        if (url.startsWith('/')) url = location.origin + url;
+        lines.push(`${f.name} — ${url}`);
+      }
+      await navigator.clipboard.writeText(lines.join('\n'));
+      toast(`🔗 ${lines.length} link(s) copiados. Valem 7 dias.`);
+    } catch (e) { toast('Erro: ' + e.message); }
+  }
+  async function addSelected() {
+    const pid = $('selPlaylist')?.value || '';
+    if (!selected.size) return toast('Marque ao menos 1 arquivo.');
+    if (!pid) return toast('Escolha a playlist.');
+    closeMenus();
+    try {
+      await Playlists.refresh();
+      let pl = Playlists.get(pid);
+      if (pl?.locked) {
+        await Vault.unlock(pid);
+        await Playlists.refresh();
+        pl = Playlists.get(pid);
+        if (!pl || pl.locked) return toast('Cofre continua trancado — nada movido. 🔒');
+      }
+      const r = await jpost(`/playlists/${pid}/files`, { fileIds: [...selected] });
+      await Playlists.refresh();
+      toast(`＋ ${r.added} na playlist. ✅`);
+      selecting = false;
+      selected.clear();
+      paintSelBanner();
+      render();
+    } catch (e) { toast('Erro: ' + e.message); }
+  }
   // Modo adicionar: da página da playlist, escolhe arquivos no drive.
   let addPid = '';
   function addMode(pid) {
@@ -176,10 +276,18 @@ const Drive = (() => {
       const total = allFiles.filter((f) => !f.trashedAt).length;
       c.textContent = list.length === total ? `${total} arquivo(s)` : `${list.length} de ${total}`;
     }
-    grid.innerHTML = list.map((f) => `
-      <div class="sp-album" onclick="Share.open('${f.id}')" title="${esc(f.name)}">
-        ${f.thumb ? `<img src="${thumbUrl(f.id)}" loading="lazy" />` : `<div class="sp-album-fallback">${icon(f)}</div>`}
-        <button class="sp-album-more" title="Mais ações" onclick="event.stopPropagation();Drive.menu('${f.id}',event)">⋮</button>
+    grid.innerHTML = list.map((f) => {
+      const sel = selecting && selected.has(f.id);
+      const click = selecting ? 'Drive.toggleSelect(\'' + f.id + '\')' : 'Share.open(\'' + f.id + '\')';
+      const cover = f.thumb
+        ? '<img src="' + thumbUrl(f.id) + '" loading="lazy" />'
+        : '<div class="sp-album-fallback">' + icon(f) + '</div>';
+      const more = selecting ? '' : '<button class="sp-album-more" title="Mais ações" onclick="event.stopPropagation();Drive.menu(\'' + f.id + '\',event)">⋮</button>';
+      return `
+      <div class="sp-album${sel ? ' selected' : ''}" onclick="${click}" title="${esc(f.name)}">
+        ${cover}
+        ${sel ? '<div class="sp-album-check">✓</div>' : ''}
+        ${more}
         <button class="sp-album-play" onclick="event.stopPropagation();Share.open('${f.id}')">▶</button>
         <div class="sp-album-title">${esc(f.name)}</div>
         <div class="sp-album-sub">${fmtMB((f.sizeOrig || 0) / 1048576)} → ${fmtMB((f.sizeFinal ?? f.sizeOrig) / 1048576)}${f.duration ? ' · ' + fmtDur(f.duration) : ''}</div>
@@ -192,7 +300,8 @@ const Drive = (() => {
           <button class="btn-ghost icon" title="Enviar" onclick="event.stopPropagation();Drive.sendFile('${f.id}')">${ICO_SEND}</button>
           <button class="btn-ghost icon" title="Copiar link" onclick="event.stopPropagation();Drive.copyLink('${f.id}')">${ICO_COPY}</button>
         </div>
-      </div>`).join('') || (searchTerm || serverIds !== null || playlistFilter
+      </div>`;
+    }).join('') || (searchTerm || serverIds !== null || playlistFilter
         ? '<span class="text-zinc-500 text-xs">Nada achado. Limpe a busca ou troque o filtro. 🔍</span>'
         : '<span class="text-zinc-500 text-xs">Nada aqui ainda. Arraste arquivos acima. ⬆</span>');
   }
@@ -408,6 +517,6 @@ const Drive = (() => {
       try { window.Upload?.watchProcessing?.(); } catch {}
     } catch (e) { toast('Erro: ' + e.message); }
   }
-  return { show, refresh, renderMock, refreshQuota, filterKind, setSearch, setServerResults, setSort, setPlaylist, render, del, cleanAll, cleanBroken, recompress, openFile, menu, menuBack, moveMenu, moveTo, moveNew, toggleStar, vaultMove, vaultNew, rename, download, offline, copyLink, sendFile, addMode, addOne, thumbUrl, dlUrl, icon, visible: () => visible(), all: () => allFiles };
+  return { show, refresh, renderMock, refreshQuota, filterKind, setSearch, setServerResults, setSort, setPlaylist, render, del, cleanAll, cleanBroken, recompress, openFile, menu, menuBack, moveMenu, moveTo, moveNew, toggleStar, vaultMove, vaultNew, rename, download, offline, copyLink, sendFile, addMode, addOne, selectMode, toggleSelect, addSelected, delSelected, dlSelected, copySelected, thumbUrl, dlUrl, icon, visible: () => visible(), all: () => allFiles };
 })();
 window.Drive = Drive;

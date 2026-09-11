@@ -9,6 +9,7 @@
 <div id="addBanner" class="proc-banner" hidden></div>
 <div class="flex justify-between items-center mt-5 mb-2">
   <h2 class="sp-h2">Seus arquivos <span id="fileCount" class="text-xs text-zinc-400"></span></h2>
+  <div id="selBanner" class="proc-banner" hidden></div>
   <div class="flex gap-2">
     <select id="sortSel" class="inp" style="width:auto;margin:0" onchange="Drive.setSort(this.value)">
       <option value="recent">Mais recentes</option>
@@ -18,6 +19,7 @@
       <option value="biggest">Maiores</option>
       <option value="smallest">Menores</option>
     </select>
+    <button onclick="Drive.selectMode()" class="btn-ghost">☑ Selecionar</button>
     <button onclick="DlQueue.start()" class="btn-ghost">⬇ Baixar lista</button>
     <button onclick="Drive.cleanBroken()" class="btn-ghost">🧹 Quebrados</button>
     <button onclick="Drive.cleanAll()" class="btn-ghost">🗑 Excluir tudo</button>

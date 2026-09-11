@@ -123,10 +123,11 @@ body.sidebar-hidden #sidebar .sp-navtoggle{transform:rotate(90deg);border-color:
 /* Bordas suaves: nada de contorno preto chapado nos painéis */
 .card,.stat-card,.kind-row,.upq,.plan-card,.user-row,.sp-album,.sp-quota-mini{border-color:rgba(255,255,255,.09)!important;box-shadow:0 10px 26px rgba(0,0,0,.35)}
 #mobileNav{display:none}
-/* Aba de retorno: invisível com a barra aberta, aparece na borda quando escondida */
-#sideReopen{position:fixed;left:0;top:50%;transform:translateY(-50%);z-index:39;width:22px;height:72px;border:0;border-radius:0 10px 10px 0;background:#1c1c1c;color:#b3b3b3;font-size:18px;cursor:pointer;opacity:0;pointer-events:none;transition:opacity .2s}
-body.sidebar-hidden #sideReopen{opacity:1;pointer-events:auto}
-#sideReopen:hover{background:var(--sp-green);color:#000}
+/* Hambúrguer fixo no topo: a sidebar é overlay, abre/fecha por aqui */
+.sp-hamburger{width:40px;height:40px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:#2e2e2e;color:#fff;border:1px solid #6b6b6b;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.6);transition:transform .25s ease,background .2s,border-color .2s}
+.sp-hamburger:hover{background:#3a3a3a;border-color:#fff}
+body.sidebar-hidden .sp-hamburger{transform:rotate(90deg);border-color:var(--sp-green);color:var(--sp-green)}
+#sideReopen{display:none!important}
 @media (max-width:900px){
 .sp-side{width:min(300px,86vw);z-index:80}
 .sp-navtoggle{z-index:90}

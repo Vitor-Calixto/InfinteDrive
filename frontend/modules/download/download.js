@@ -94,15 +94,16 @@ const DlQueue = (() => {
     if (!failed.length) toast(`⬇ Pronto: ${queue.length} baixado(s)${dups ? `, ${dups} duplicado(s) pulados` : ''}.`);
   }
 
-  async function start() {
+  async function start(only) {
     if (!window.showDirectoryPicker) {
       toast('A fila precisa de Chrome/Edge. Alternativa: peça o .zip.');
       return;
     }
     if (!getToken()) return toast('Entre primeiro.');
-    // Respeita o filtro atual (tipo/playlist/busca): baixa o que está na tela.
-    const ready = Drive.visible().filter((f) => !f.trashedAt && f.compressed);
-    const pend = Drive.visible().filter((f) => !f.trashedAt && !f.compressed);
+    // Com lista (multisseleção) usa ela; sem, respeita o filtro atual.
+    const base = Array.isArray(only) && only.length ? only : Drive.visible();
+    const ready = base.filter((f) => !f.trashedAt && f.compressed);
+    const pend = base.filter((f) => !f.trashedAt && !f.compressed);
     if (!ready.length) {
       toast(pend.length ? `⏳ ${pend.length} ainda comprimindo. Baixe quando prontos.` : 'Nada para baixar aqui.');
       return;

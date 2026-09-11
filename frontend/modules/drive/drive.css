@@ -21,6 +21,8 @@
 .sp-album-row .btn-ghost{flex:1;justify-content:center}
 .sp-album-more{position:absolute;top:8px;right:8px;width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,.65);color:#fff;border:1px solid rgba(255,255,255,.2);font-size:15px;font-weight:800;cursor:pointer;z-index:2;line-height:1}
 .sp-album-more:hover{background:var(--sp-green);color:#000;border-color:var(--sp-green)}
+.sp-album.selected{outline:3px solid var(--sp-green)}
+.sp-album-check{position:absolute;top:8px;left:8px;width:30px;height:30px;border-radius:50%;background:var(--sp-green);color:#000;font-weight:800;display:flex;align-items:center;justify-content:center;z-index:2}
 .btn-ghost.icon{padding:7px 9px;display:inline-flex;align-items:center}
 .card-menu{position:fixed;z-index:120;min-width:220px}
 .sp-menu-title{font-size:12px;font-weight:700;color:#a1a1aa;padding:9px 10px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
