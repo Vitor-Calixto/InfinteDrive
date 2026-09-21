@@ -178,3 +178,47 @@ Criação do cliente: https://console.cloud.google.com/auth/clients/create?organ
 ## Cap. 7 — Roadmap (o que falta)
 
 Pagamento (Pix + webhook→quota) · botão excluir conta · termos/LGPD · tier S3 (+2ª via H.265 fria) · ghostscript p/ PDF · baixar playlist em zip · app nativo (Capacitor) + WebAuthn · AVIF em fotos + denoise leve. Nada disso quebra o que existe.
+
+---
+
+## Cap. 8 — Diário de confecção + links (08–11/09/2026)
+
+Etapas reais, na ordem, com as páginas usadas em cada uma.
+
+### E1 — Base (08/09): auth, storage, compressão, playlists, cofre, busca, lixeira, share, import, PWA
+- App local: http://localhost:4000/ (demo: `?demo=1`) · saúde: `/api/health` · link público: `/s/:token`
+- Repositório: https://github.com/Vitor-Calixto/InfinteDrive
+
+### E2 — Front modular (estilo InfiniteDrive, sem app.js monólito)
+- Shell + 14 módulos em `frontend/modules/` (auth, drive, playlists, player, search, upload, share, vault, profiles, trash, system, import, admin, planos) + views lazy em `viewHost`
+
+### E3 — 2FA + busca servidor
+- Login em 2 passos (`/auth/2fa/*`, TOTP + códigos reserva 1 uso) · gestão na tela Conta
+- Busca full-text (`/api/search?q=`): nome > tipo > corpo de PDF, com snippet e rank
+
+### E4 — Google: redirect OAuth + Picker (sem popup)
+- Cloud Console: https://console.cloud.google.com/ → projeto DriveSpotify
+- Auth Platform: Branding · Público-alvo (modo Teste + test users) · Acesso a dados (escopos) · Clientes (ID, segredo, redirect URIs) · Biblioteca (ativar APIs)
+- Credenciais: https://console.cloud.google.com/apis/credentials
+- Escopos (string completa): `https://www.googleapis.com/auth/drive.readonly` · `https://www.googleapis.com/auth/photospicker.mediaitems.readonly`
+- Redirect URI local: `http://localhost:4000/api/auth/google/callback`
+- Conta Google (2FA, senhas de app): https://myaccount.google.com/ · direto: https://myaccount.google.com/apppasswords
+- Doc decisiva: https://developers.google.com/photos/picker/guides/sessions · listagem certa: https://developers.google.com/photos/picker/reference/rest/v1/mediaItems/list (`GET /v1/mediaItems?sessionId=…` — NÃO `/sessions/{id}/mediaItems`)
+- Detailhe que queimou horas: Library API morreu p/ leitura geral em 31/03/2025 (`photoslibrary.readonly` + `mediaItems:search` voltam vazios)
+- Detalhe técnico: `DOCS-GOOGLE.md` (fluxo, troubleshooting, diagnóstico via `build` no `/health` + `data/picker-debug.log`)
+
+### E5 — Compressão e filas
+- Pipeline: imagem→WebP q70 · áudio→Opus 96k · vídeo→H.264 720p/30 CRF 30 + denoise + GOP 300 (pool `COMPRESS_WORKERS`, menores primeiro, retry 3x, reconcile no boot)
+- Upload: simples + fatiado 8MB com resume, 3 simultâneos, retry 429 com `Retry-After`, reconcile de fatias
+- Fila de downloads (Chrome/Edge): pasta, menor→maior, dedup por SHA256, resume por Range
+- Benchmark AV1/HEVC arquivado: sem encoder no build; decisão = não perder qualidade (`PENDENCIAS.md`)
+
+### E6 — Biblioteca e telas
+- Cards com menu ⋮ funcional (renomear, baixar, mover, estrela, cofre, offline, recompressão), multisseleção em lote, fila visível por arquivo, % de compressão por card, badge de quebrado na origem
+- Playlists (grade + detalhe + capa), Perfis (PIN), Cofre, Lixeira (restaurar tudo, datas), Conta (quota, por-tipo), Planos (calculadora), Admin (telefone, busca auditada, reset 1x), Cloudflare (token, zonas, DNS, purge), Termos (view + modal + aceite)
+- E-mail: `backend/.env` (`SMTP_HOST/PORT/USER/PASS/FROM`) — Gmail exige senha de app
+- Pacotes npm centrais: express · helmet · express-rate-limit · bcryptjs · jsonwebtoken · multer · sharp · ffmpeg-static · google-auth-library · nodemailer · archiver · qrcode · music-metadata · pdf-parse · ssh2 · uuid · yauzl · cors · compression · dotenv
+
+### E7 — Infra pendente (na VPS)
+- Contabo: https://my.contabo.com/ · Cloudflare: https://dash.cloudflare.com/ (túnel + DNS + purge; guia adaptado em `PENDENCIAS.md`)
+- Falta: domínio próprio, nginx→:4000, HTTPS, `PUBLIC_URL`/`CLIENT_URL` finais, auditoria de segurança, backup `data/` validado
