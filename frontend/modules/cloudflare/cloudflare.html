@@ -1,0 +1,29 @@
+<h1 class="sp-greet">Cloudflare 🌐</h1>
+<p class="hint">DNS + purge sem sair do app. Token com <b>DNS:edit + Cache purge</b> na zona, guardado AES-GCM.</p>
+<div class="card">
+  <h2 class="card-title">Token API</h2>
+  <div id="cfCreds" class="text-xs text-zinc-400">–</div>
+  <div class="grid grid-cols-2 gap-2 mt-2">
+    <input id="cf_label" class="inp" placeholder="Rótulo (ex: principal)" />
+    <input id="cf_token" class="inp" type="password" placeholder="Token (cole 1x, não mostramos de novo)" autocomplete="off" />
+  </div>
+  <button onclick="Cf.save()" class="btn mt-2">Salvar token</button>
+</div>
+<div class="card mt-4">
+  <div class="flex justify-between items-center">
+    <h2 class="card-title">Zonas</h2>
+    <button onclick="Cf.zones()" class="btn-ghost">Atualizar</button>
+  </div>
+  <select id="cf_zone" class="inp mt-2" onchange="Cf.dns()"><option value="">— escolha a zona —</option></select>
+  <div id="cfDns" class="space-y-1 mt-2 text-sm"></div>
+  <div class="grid grid-cols-2 gap-2 mt-2">
+    <select id="cf_type" class="inp"><option>A</option><option>AAAA</option><option>CNAME</option><option>TXT</option></select>
+    <input id="cf_name" class="inp" placeholder="nome.exemplo.com" />
+    <input id="cf_content" class="inp" placeholder="conteúdo (IP ou alvo)" />
+    <label class="text-xs text-zinc-400 flex gap-2 items-center"><input id="cf_proxied" type="checkbox" checked /> proxy ☁</label>
+  </div>
+  <div class="flex gap-2 mt-2">
+    <button onclick="Cf.addDns()" class="btn">Criar DNS</button>
+    <button onclick="Cf.purge()" class="btn-ghost">🧹 Limpar cache</button>
+  </div>
+</div>

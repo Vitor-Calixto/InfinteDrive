@@ -43,7 +43,7 @@ const Admin = (() => {
       if (me.role !== 'admin') return;
       const list = await jget('/auth/overview');
       $('usersBox').innerHTML = list.map((u) => `<div class="user-row">
-        <div><b>${esc(u.name)}</b> <span class="text-xs text-zinc-400">${esc(u.email)} · ${esc(u.role)} · ${esc(u.plan || '')}</span></div>
+        <div><b>${esc(u.name)}</b> <span class="text-xs text-zinc-400">${esc(u.phone || 'sem telefone')} · ${esc(u.role)} · ${esc(u.plan || '')}</span></div>
         <div class="flex justify-between text-xs text-zinc-400"><span>${fmtMB(u.usedMB)} de ${fmtMB(u.quotaMB)} · ${u.files} arq.</span><span>${u.pct}%</span></div>
         <div class="sp-bar"><div style="width:${Math.min(100, u.pct)}%"></div></div>
         <div class="flex gap-2 mt-2">
@@ -71,11 +71,30 @@ const Admin = (() => {
   }
   async function createUser() {
     try {
-      const r = await jpost('/auth/users', { name: $('nu_name').value, email: $('nu_email').value, password: $('nu_pass').value, role: 'user' });
+      const r = await jpost('/auth/users', { name: $('nu_name').value, email: $('nu_email').value, phone: $('nu_phone').value, password: $('nu_pass').value, role: 'user' });
       await jpatch('/auth/users/' + r.id, { plan: $('nu_plan').value });
       $('nu_state').textContent = 'Conta ' + r.email + ' criada.';
+      $('nu_name').value = ''; $('nu_email').value = ''; $('nu_phone').value = ''; $('nu_pass').value = '';
       refreshUsers();
     } catch (e) { $('nu_state').textContent = 'Erro: ' + e.message; }
+  }
+  async function searchUser() {
+    const box = $('su_box');
+    try {
+      const u = await jget('/auth/users/search?email=' + encodeURIComponent($('su_email').value.trim()));
+      box.innerHTML = `<div class="user-row"><b>${esc(u.name)}</b> · ${esc(u.email)} · ${esc(u.phone || 'sem telefone')} · ${esc(u.role)} · plano ${esc(u.plan)}${u.tfaEnabled ? ' · 🔒2FA' : ''}
+        <div class="flex gap-2 mt-2"><button class="btn-ghost" onclick="Admin.resetPw('${u.id}')">Redefinir senha</button></div>
+        <div id="su_tmp" class="text-xs mt-2"></div></div>`;
+    } catch (e) { box.innerHTML = `<span class="text-red-400">${esc(e.message)}</span>`; }
+  }
+  async function resetPw(id) {
+    if (!await confirmDlg('Gerar senha temporária? Desloga o usuário em tudo. Anote: aparece 1x.')) return;
+    try {
+      const r = await jpost(`/auth/users/${id}/reset-password`, {});
+      const t = $('su_tmp');
+      if (t) t.innerHTML = `Temporária (1x): <b>${esc(r.tempPassword)}</b> <button class="sp-link" onclick="navigator.clipboard.writeText('${esc(r.tempPassword)}')">copiar</button>`;
+      toast('Senha redefinida. Passe a temporária ao usuário.');
+    } catch (e) { toast('Erro: ' + e.message); }
   }
   async function refreshBackups() {
     try {
@@ -91,6 +110,6 @@ const Admin = (() => {
       refreshBackups();
     } catch (e) { $('backupState').textContent = 'Erro: ' + e.message; }
   }
-  return { show, loadDisk, refreshUsers, createUser, refreshBackups, makeBackup, planQuota, savePlan, delUser };
+  return { show, loadDisk, refreshUsers, createUser, refreshBackups, makeBackup, planQuota, savePlan, delUser, searchUser, resetPw };
 })();
 window.Admin = Admin;

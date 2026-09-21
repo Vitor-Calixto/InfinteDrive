@@ -8,7 +8,16 @@ import {
   issueResetToken, consumeResetToken, setDev, setPlan, isLastAdmin,
   findOrCreateGoogle, quotaFor, tfaSetupStart, tfaEnable, tfaCheck, tfaDisable,
 } from '../config/users.js';
-import { wipeUserData } from '../services/fileGuard.js';
+import { wipeUserData, appendAudit } from '../services/fileGuard.js';
+import crypto from 'node:crypto';
+
+// Temporária legível (sem 0/O/l/1 pra não confundir ditando por telefone).
+function randomTmp() {
+  const abc = 'abcdefghjkmnpqrstuvwxyz23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+  let s = '';
+  for (const b of crypto.randomBytes(12)) s += abc[b % abc.length];
+  return s;
+}
 import { sendResetEmail } from '../services/mailer.js';
 import { requireAuth, loginLimiter } from '../middlewares/auth.js';
 
@@ -21,8 +30,9 @@ r.post('/register', (req, res) => {
     if (readCollection('users').length > 0) {
       return res.status(403).json({ error: 'Registro fechado. Peça a um admin.' });
     }
-    const { name, email, password } = req.body || {};
-    const u = createUser({ name, email, password, role: 'admin' });
+    const { name, email, password, phone, acceptedTerms } = req.body || {};
+    if (!acceptedTerms) return res.status(400).json({ error: 'Aceite os Termos para criar a conta.' });
+    const u = createUser({ name, email, password, phone, phoneRequired: true, acceptedTerms: true, role: 'admin' });
     return res.json({ user: publicUser(u), token: signToken(u) });
   } catch (e) { return res.status(400).json({ error: e.message }); }
 });
@@ -31,8 +41,8 @@ r.post('/register', (req, res) => {
 r.post('/users', requireAuth, (req, res) => {
   try {
     if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Acesso negado.' });
-    const { name, email, password, role, quotaMB } = req.body || {};
-    const u = createUser({ name, email, password, role, quotaMB });
+    const { name, email, password, phone, role, quotaMB } = req.body || {};
+    const u = createUser({ name, email, password, phone, phoneRequired: true, role, quotaMB });
     return res.json(publicUser(u));
   } catch (e) { return res.status(400).json({ error: e.message }); }
 });
@@ -44,7 +54,9 @@ r.get('/users', requireAuth, (req, res) => {
   } catch (e) { return res.status(400).json({ error: e.message }); }
 });
 
-// GET /api/auth/overview — admin: cada usuário com uso real (MB), quota e plano.
+// GET /api/auth/overview — admin: telefone (NÃO e-mail: privacidade), uso e plano.
+// E-mail só aparece em busca direcionada (/users/search), auditada.
+
 r.get('/overview', requireAuth, (req, res) => {
   try {
     if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Acesso negado.' });
@@ -55,13 +67,42 @@ r.get('/overview', requireAuth, (req, res) => {
       const usedB = mine.reduce((a, f) => a + (Number(f.sizeFinal ?? f.sizeOrig) || 0), 0);
       const quotaMB = Number(u.quotaMB) > 0 ? Number(u.quotaMB) : quotaFor(u.plan);
       return {
-        id: u.id, name: u.name, email: u.email, role: u.role,
+        id: u.id, name: u.name, phone: u.phone || '', role: u.role,
         plan: u.plan || 'Leve', quotaMB,
         usedMB: toMB(usedB), files: mine.length,
         pct: quotaMB > 0 ? Number(((toMB(usedB) / quotaMB) * 100).toFixed(1)) : 0,
         createdAt: u.createdAt,
       };
     }));
+  } catch (e) { return res.status(400).json({ error: e.message }); }
+});
+
+// GET /api/auth/users/search?email= — admin: acha 1 conta pelo e-mail (auditado).
+// É o único lugar que revela o e-mail + permite redefinir a senha.
+// (A senha NUNCA é exibida: só existe hash. Redefinir gera temporária 1x.)
+r.get('/users/search', requireAuth, (req, res) => {
+  try {
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Acesso negado.' });
+    const u = findByEmail(req.query.email);
+    if (!u) return res.status(404).json({ error: 'Ninguém com esse e-mail.' });
+    appendAudit({ userId: req.user.id, action: 'admin-search', ip: req.ip, detail: u.email });
+    return res.json({ id: u.id, name: u.name, email: u.email, phone: u.phone || '', role: u.role, plan: u.plan || 'Leve', tfaEnabled: !!u.tfaEnabled, createdAt: u.createdAt });
+  } catch (e) { return res.status(400).json({ error: e.message }); }
+});
+
+// POST /api/auth/users/:id/reset-password — admin: nova temporária (1x na tela).
+// Desloga tudo (bump) + audita. Nunca devolve a senha antiga (só hash).
+r.post('/users/:id/reset-password', requireAuth, (req, res) => {
+  try {
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Acesso negado.' });
+    const u = findById(req.params.id);
+    if (!u) return res.status(404).json({ error: 'Usuário não encontrado.' });
+    if (!u.passHash) return res.status(400).json({ error: 'Conta Google: sem senha local.' });
+    const tmp = randomTmp();
+    setPassword(u.id, tmp);
+    bumpTokenVersion(u.id);
+    appendAudit({ userId: req.user.id, action: 'admin-reset-pw', ip: req.ip, detail: u.email });
+    return res.json({ tempPassword: tmp });
   } catch (e) { return res.status(400).json({ error: e.message }); }
 });
 

@@ -8,6 +8,8 @@ const Shell = (() => {
     planos: { html: 'modules/planos/planos.html', css: 'modules/planos/planos.css', onShow: () => Planos.show() },
     import: { html: 'modules/import/import.html', css: 'modules/import/import.css', onShow: () => ImportMod.show() },
     admin: { html: 'modules/admin/admin.html', css: 'modules/admin/admin.css', onShow: () => Admin.show() },
+    cloudflare: { html: 'modules/cloudflare/cloudflare.html', css: 'modules/cloudflare/cloudflare.css', js: null, onShow: () => Cf.show() },
+    terms: { html: 'modules/terms/terms.html', css: null, onShow: () => Terms.show() },
     trash: { html: 'modules/trash/trash.html', css: 'modules/trash/trash.css', onShow: () => Trash.show() },
     vault: { html: 'modules/vault/vault.html', css: 'modules/vault/vault.css', onShow: () => Vault.show() },
   };

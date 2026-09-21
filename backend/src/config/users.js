@@ -62,7 +62,17 @@ export function findById(id) {
   return readCollection('users').find((u) => u.id === id) || null;
 }
 
-export function createUser({ name, email, password, role = 'user', quotaMB }) {
+export function cleanPhone(phone, required) {
+  const digits = String(phone || '').replace(/\D/g, '');
+  if (!digits) {
+    if (required) throw new Error('Informe o telefone (DDD + número).');
+    return '';
+  }
+  if (digits.length < 10 || digits.length > 13) throw new Error('Telefone inválido (DDD + número).');
+  return digits;
+}
+
+export function createUser({ name, email, password, role = 'user', quotaMB, phone = '', phoneRequired = false, acceptedTerms = false }) {
   const cleanName = String(name || '').trim().slice(0, 80) || 'usuário';
   const cleanEmail = String(email || '').trim().toLowerCase();
   if (!EMAIL_RE.test(cleanEmail)) throw new Error('E-mail inválido.');
@@ -74,12 +84,14 @@ export function createUser({ name, email, password, role = 'user', quotaMB }) {
     id: randomUUID(),
     name: cleanName.replace(/[<>"']/g, ''),
     email: cleanEmail,
+    phone: cleanPhone(phone, phoneRequired),
     passHash: hashPassword(password),
     role: finalRole,
     plan: 'Leve',
     quotaMB: Number(quotaMB) > 0 ? Math.min(Number(quotaMB), 5 * 1024 * 1024) : quotaFor('Leve'),
     dev: false, // modo programador: revela Deploy/Sistema (usuário liga no perfil)
     tokenVersion: 1,
+    acceptedTermsAt: acceptedTerms ? new Date().toISOString() : '',
     createdAt: new Date().toISOString(),
   };
   upsertRow('users', row);

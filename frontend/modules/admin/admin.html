@@ -19,14 +19,24 @@
   </div>
   <div class="card mt-2" style="background:#1b1b1b">
     <h3 class="text-sm font-semibold">＋ Nova conta</h3>
-    <div class="grid grid-cols-2 gap-2 mt-2">
-      <input id="nu_name" class="inp" placeholder="Nome" />
-      <input id="nu_email" class="inp" placeholder="E-mail" />
-      <input id="nu_pass" class="inp" type="password" placeholder="Senha (8+)" />
-      <select id="nu_plan" class="inp"><option>Leve</option><option>Plus</option><option>Studio</option></select>
-    </div>
-    <button onclick="Admin.createUser()" class="btn mt-2">Criar conta</button>
-    <div id="nu_state" class="text-xs mt-2 text-zinc-400"></div>
+          <div class="grid grid-cols-2 gap-2 mt-2">
+            <input id="nu_name" class="inp" placeholder="Nome" />
+            <input id="nu_email" class="inp" placeholder="E-mail" />
+            <input id="nu_phone" class="inp" inputmode="tel" placeholder="Telefone (DDD + número)" />
+            <input id="nu_pass" class="inp" type="password" placeholder="Senha (8+)" />
+            <select id="nu_plan" class="inp col-span-2"><option>Leve</option><option>Plus</option><option>Studio</option></select>
+          </div>
+          <button onclick="Admin.createUser()" class="btn mt-2">Criar conta</button>
+          <div id="nu_state" class="text-xs mt-2 text-zinc-400"></div>
+        </div>
+        <div class="card mt-2" style="background:#1b1b1b">
+          <h3 class="text-sm font-semibold">🔍 Buscar por e-mail (auditado)</h3>
+          <p class="hint">A lista mostra telefone, não e-mail. A senha nunca é exibida (só hash): aqui você redefine.</p>
+          <div class="flex gap-2 mt-2">
+            <input id="su_email" class="inp" style="margin:0" placeholder="e-mail exato" />
+            <button onclick="Admin.searchUser()" class="btn-ghost">Buscar</button>
+          </div>
+          <div id="su_box" class="text-sm mt-2"></div>
   </div>
   <div id="usersBox" class="space-y-2 text-sm mt-2"></div>
 </div>

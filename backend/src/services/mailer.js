@@ -28,12 +28,18 @@ export async function sendResetEmail(to, link) {
     console.log(`[dev] link de recuperação para ${to}: ${link}`);
     return { dev: true };
   }
+  const brand = 'Deploy Center';
   await t.sendMail({
-    from: process.env.SMTP_FROM || 'Deploy Center <no-reply@localhost>',
+    from: process.env.SMTP_FROM || `${brand} <no-reply@localhost>`,
     to,
-    subject: 'Recupere sua senha — Deploy Center',
-    text: `Troque sua senha (vale 1h): ${link}\nSe não foi você, ignore.`,
-    html: `<p>Troque sua senha (vale 1h):</p><p><a href="${link}">Definir nova senha</a></p><p>Se não foi você, ignore.</p>`,
+    subject: `Recupere sua senha — ${brand}`,
+    text: `Olá!\n\nRecebemos um pedido de troca de senha da sua conta ${brand}.\n\nDefina a nova senha aqui (vale 1 hora): ${link}\n\nSe não foi você, ignore este e-mail — sua senha continua a mesma.\n\nEquipe ${brand}`,
+    html: `<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;background:#121212;color:#fff;border-radius:16px;padding:28px">
+      <div style="font-size:20px;font-weight:800;margin-bottom:12px"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#1DB954"></span> ${brand}</div>
+      <p>Olá! Recebemos um pedido de troca de senha da sua conta.</p>
+      <p><a href="${link}" style="display:inline-block;background:#1DB954;color:#000;font-weight:700;text-decoration:none;border-radius:999px;padding:12px 28px">Definir nova senha</a></p>
+      <p style="color:#a1a1aa;font-size:12px">O link vale 1 hora. Se não foi você, ignore — sua senha continua a mesma.</p>
+    </div>`,
   });
   return { dev: false };
 }

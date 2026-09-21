@@ -39,7 +39,8 @@ const Auth = (() => {
   }
   async function register() {
     try {
-      const r = await jpost('/auth/register', { name: $('u_name').value || 'admin', email: $('r_email').value, password: $('r_pass').value });
+      if (!$('r_terms')?.checked) return toast('Aceite os Termos para criar a conta.');
+      const r = await jpost('/auth/register', { name: $('u_name').value || 'admin', email: $('r_email').value, phone: $('r_phone').value, password: $('r_pass').value, acceptedTerms: true });
       after(r.user, r.token);
     } catch (e) { toast('Erro: ' + e.message); }
   }
@@ -86,6 +87,8 @@ const Auth = (() => {
     try { window.Shell?.paintUser?.(user); } catch {}
     const na = document.getElementById('navAdmin');
     if (na) na.hidden = user?.role !== 'admin';
+    const nc = document.getElementById('navCf');
+    if (nc) nc.hidden = !(user?.role === 'admin' || user?.dev);
     try { Drive.refresh(); Profiles.refresh(); Playlists.refresh(); } catch (e) { console.warn(e); }
   }
   // Demo: shell visível + mocks pra validar sidebar, telas, player sem API.

@@ -18,8 +18,9 @@
 
 ## 🔵 Frontend (falta pouco)
 - [x] Player (seek, auto-next, MediaSession) · pages/ removidas · admin só p/ admin · vazios.
+- [x] **Cloudflare: tela** (token, zonas, DNS, purge).
+- [x] **Termos de Uso** (view + modal + aceite no cadastro).
 - [ ] mobileNav sem playlists/profiles/vault (só 5 itens).
-- [ ] **Cloudflare: tela** (backend DNS/purge pronto, sem front).
 
 ## ⚙️ Produção (Contabo VPS)
 - [ ] `COMPRESS_WORKERS` por vCPU · backup `data/` validado · HTTPS + `PUBLIC_URL`/`CLIENT_URL`.

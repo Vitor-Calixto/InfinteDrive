@@ -36,7 +36,9 @@
       <div id="authRegister" hidden>
         <input id="u_name" class="inp" placeholder="Nome" />
         <input id="r_email" class="inp" placeholder="E-mail" />
+        <input id="r_phone" class="inp" inputmode="tel" placeholder="Telefone (DDD + número)" />
         <input id="r_pass" class="inp" type="password" placeholder="Senha (8+ caracteres)" />
+        <label class="text-xs text-zinc-400 flex gap-2 items-center mt-2" style="justify-content:center"><input id="r_terms" type="checkbox" /> Li e aceito os <button class="sp-link" onclick="Terms.open()">Termos</button></label>
         <button onclick="Auth.register()" class="btn-big">Cadastrar</button>
         <div class="mt-2 text-xs"><button onclick="Auth.show('login')" class="sp-link">Voltar ao login</button></div>
       </div>
@@ -96,6 +98,8 @@
             <button class="sp-nav-btn" data-view="trash" onclick="Shell.show('trash')">🗑 <span class="side-label">Lixeira</span></button>
             <button class="sp-nav-btn" data-view="vault" onclick="Shell.show('vault')">🔒 <span class="side-label">Cofre</span></button>
             <button class="sp-nav-btn" data-view="admin" id="navAdmin" onclick="Shell.show('admin')" hidden>⚙ <span class="side-label">Admin</span></button>
+            <button class="sp-nav-btn" data-view="cloudflare" id="navCf" onclick="Shell.show('cloudflare')" hidden>🌐 <span class="side-label">Cloudflare</span></button>
+            <button class="sp-nav-btn" data-view="terms" onclick="Shell.show('terms')">📜 <span class="side-label">Termos</span></button>
           </nav>
         </div>
       </div>
@@ -159,6 +163,13 @@
       <div class="sp-confirm-row"><button id="inputNo" class="btn-ghost">Cancelar</button><button id="inputYes" class="btn">Salvar</button></div>
     </div>
   </div>
+  <div id="termsBox" class="sp-modal" hidden onclick="if(event.target===this)Terms.close()">
+    <div class="sp-confirm" style="width:min(560px,94vw);text-align:left;max-height:84vh;overflow:auto">
+      <h2 class="card-title">Termos de Uso 📜</h2>
+      <div id="termsBoxBody" class="text-sm" style="display:flex;flex-direction:column;gap:10px"></div>
+      <div class="sp-confirm-row mt-2"><button onclick="Terms.close()" class="btn">Fechar</button></div>
+    </div>
+  </div>
   <div id="confirmBox" class="sp-modal" hidden>
     <div class="sp-confirm"><div id="confirmMsg" class="sp-confirm-msg"></div>
       <div class="sp-confirm-row"><button id="confirmNo" class="btn-ghost">Cancelar</button><button id="confirmYes" class="btn">Confirmar</button></div>
@@ -181,6 +192,8 @@
   <script src="modules/system/system.js"></script>
   <script src="modules/import/import.js"></script>
   <script src="modules/admin/admin.js"></script>
+  <script src="modules/terms/terms.js"></script>
+  <script src="modules/cloudflare/cloudflare.js"></script>
   <script src="modules/planos/planos.js"></script>
   <script src="js/shell.js"></script>
 </body>
