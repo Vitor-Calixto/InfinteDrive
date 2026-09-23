@@ -290,7 +290,7 @@ const Drive = (() => {
         ${more}
         <button class="sp-album-play" onclick="event.stopPropagation();Share.open('${f.id}')">▶</button>
         <div class="sp-album-title">${esc(f.name)}</div>
-        <div class="sp-album-sub">${fmtMB((f.sizeOrig || 0) / 1048576)} → ${fmtMB((f.sizeFinal ?? f.sizeOrig) / 1048576)}${f.duration ? ' · ' + fmtDur(f.duration) : ''}</div>
+        <div class="sp-album-sub">${fmtMB((f.sizeOrig || 0) / 1048576)} → ${fmtMB((f.sizeFinal ?? f.sizeOrig) / 1048576)}${f.duration ? ' · ' + fmtDur(f.duration) : ''}${isOff(f.id) ? ' · 📴' : ''}</div>
         ${f.broken ? `<div class="sp-album-broken" title="${esc(f.note || 'Sem conteúdo')}">⚠️ quebrado na origem</div>` : ''}
         ${!f.broken ? pendLine(f) : ''}
         ${f.snippet ? `<div class="sp-album-snippet">…${esc(f.snippet)}…</div>` : ''}
@@ -460,9 +460,44 @@ const Drive = (() => {
     a.click();
     a.remove();
   }
-  function offline(id) {
-    download(id);
-    toast('📴 Baixando pro aparelho — fica disponível offline.');
+  let offCache = null;
+  const offKey = () => {
+    if (offCache) return offCache;
+    try { offCache = new Set(JSON.parse(localStorage.getItem('dc_offline') || '[]')); }
+    catch { offCache = new Set(); }
+    return offCache;
+  };
+  const offSave = (s) => { offCache = s; try { localStorage.setItem('dc_offline', JSON.stringify([...s])); } catch {} };
+  const isOff = (id) => offKey().has(id);
+  // 📴 Deixar offline: guarda no cache do app (abre sem internet). Toggle.
+  async function offline(id) {
+    closeMenus();
+    const f = allFiles.find((x) => x.id === id);
+    if (!f) return;
+    const set = offKey();
+    try {
+      const c = await caches.open('dc-media-v1');
+      if (set.has(id)) {
+        await c.delete(api() + '/storage/download/' + id);
+        await c.delete(api() + '/storage/thumb/' + id);
+        set.delete(id); offSave(set);
+        render();
+        return toast('📴 Removido do offline.');
+      }
+      if (!navigator.onLine) return toast('Sem internet: conecte pra guardar.');
+      try { await navigator.storage?.persist?.(); } catch {}
+      toast('📴 Guardando pra offline…');
+      const r = await fetch(api() + '/storage/download/' + id, { headers: authHeaders() });
+      if (!r.ok) throw new Error((await r.text()).slice(0, 100));
+      await c.put(api() + '/storage/download/' + id, r);
+      try {
+        const t = await fetch(api() + '/storage/thumb/' + id, { headers: authHeaders() });
+        if (t.ok) await c.put(api() + '/storage/thumb/' + id, t);
+      } catch {}
+      set.add(id); offSave(set);
+      render();
+      toast('📴 Disponível offline. ✅');
+    } catch (e) { toast('Erro: ' + e.message); }
   }
   async function copyLink(id) {
     try {

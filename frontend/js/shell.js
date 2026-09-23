@@ -130,6 +130,19 @@ const Shell = (() => {
         window.Upload?.send(e.dataTransfer.files);
       }
     });
+    // Offline: registra o SW (shell abre sem net) + bolinha de rede no topo.
+    try {
+      if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      }
+    } catch {}
+    const paintNet = () => {
+      const d = $('netDot');
+      if (d) { d.textContent = navigator.onLine ? '🟢' : '⚪'; d.title = navigator.onLine ? 'Online' : 'Offline — só o marcado 📴 abre'; }
+    };
+    paintNet();
+    window.addEventListener('online', () => { paintNet(); toast('De volta online. 🟢'); });
+    window.addEventListener('offline', () => { paintNet(); toast('Offline — valendo o marcado 📴.'); });
     try { await Auth.me(); } catch (e) { console.warn(e); }
     try { Auth.initGoogle(); } catch {}
     await show('drive');

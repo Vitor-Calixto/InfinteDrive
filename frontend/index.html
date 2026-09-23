@@ -1,10 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <script>
-    // Mata Service Workers fósseis (do projeto antigo) que servem HTML velho sem falar com o servidor.
-    if ('serviceWorker' in navigator) { navigator.serviceWorker.getRegistrations().then(function (rs) { rs.forEach(function (r) { r.unregister(); }); }).catch(function () {}); }
-  </script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#000000" />
@@ -113,6 +109,7 @@
       <header class="sp-topbar">
         <div class="sp-topbar-left">
           <button class="sp-hamburger" onclick="Shell.toggleSidebar(event)" title="Biblioteca — abrir / recolher" aria-label="Abrir ou recolher biblioteca"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="2" y1="4" x2="16" y2="4"/><line x1="2" y1="9" x2="16" y2="9"/><line x1="2" y1="14" x2="16" y2="14"/></svg></button>
+          <span id="netDot" title="Online">🟢</span>
           <input id="search" class="sp-search" placeholder="O que você quer ouvir ou buscar? 🔍" oninput="Search.onInput(this.value)" />
           <button class="sp-top-exit" onclick="Auth.logout()" title="Sair">↩</button>
         </div>
