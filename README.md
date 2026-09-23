@@ -32,6 +32,7 @@
 * Cap. 5 — Modelo de negócio (por que 20GB valem 200GB)
 * Cap. 6 — Rodando local + variáveis de ambiente
 * Cap. 7 — Roadmap (o que falta)
+Cap. 8 — Diário de confecção + links
 
 ---
 

@@ -17,13 +17,15 @@
 .sp-album-title{font-weight:700;font-size:14px;margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sp-album-sub{color:#b3b3b3;font-size:12px}
 .sp-album-snippet{color:#8ab48a;font-size:11px;margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.sp-album-row{display:flex;gap:6px;margin-top:8px}
+.sp-album-row{display:flex;gap:4px;margin-top:6px}
 .sp-album-row .btn-ghost{flex:1;justify-content:center}
+.sp-album-row svg{width:12px;height:12px}
 .sp-album-more{position:absolute;top:8px;right:8px;width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,.65);color:#fff;border:1px solid rgba(255,255,255,.2);font-size:15px;font-weight:800;cursor:pointer;z-index:2;line-height:1}
 .sp-album-more:hover{background:var(--sp-green);color:#000;border-color:var(--sp-green)}
 .sp-album.selected{outline:3px solid var(--sp-green)}
 .sp-album-check{position:absolute;top:8px;left:8px;width:30px;height:30px;border-radius:50%;background:var(--sp-green);color:#000;font-weight:800;display:flex;align-items:center;justify-content:center;z-index:2}
-.btn-ghost.icon{padding:7px 9px;display:inline-flex;align-items:center}
+.btn-ghost.icon{padding:5px 7px;display:inline-flex;align-items:center}
+.drive-hotbar{position:sticky;bottom:8px;z-index:30;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;background:rgba(18,18,18,.92);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:10px 14px;margin-top:14px;box-shadow:0 10px 26px rgba(0,0,0,.5)}
 .card-menu{position:fixed;z-index:120;min-width:220px}
 .sp-menu-title{font-size:12px;font-weight:700;color:#a1a1aa;padding:9px 10px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
 .sp-album-prog{height:6px;background:#2e2e2e;border-radius:999px;overflow:hidden;margin-top:6px}

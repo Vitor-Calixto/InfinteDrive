@@ -8,4 +8,3 @@
 .stat-hint{color:#71717a;font-size:11px;margin-top:2px}
 .kind-list{display:flex;flex-direction:column;gap:10px;margin-top:6px}
 .kind-row{background:#141414;border:1px solid #262626;border-radius:10px;padding:10px 12px}
-@media(max-width:700px){.stat-grid{grid-template-columns:repeat(2,1fr)}}

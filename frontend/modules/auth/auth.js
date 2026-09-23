@@ -80,15 +80,34 @@ const Auth = (() => {
       after(u, getToken(), true);
     } catch { setLogged(false); show('login'); }
   }
-  function after(user, token, silent) {
+  async function gateTerms(user) {
+    if (user?.acceptedTermsAt || user?.role === undefined) return true;
+    const ok = await Terms.gate();
+    if (ok) {
+      try {
+        const u = await jget('/auth/me');
+        window._user = u;
+        return true;
+      } catch { return true; }
+    }
+    setToken('');
+    setLogged(false);
+    show('login');
+    toast('Sem aceitar os Termos, o acesso é negado. Até logo! 👋');
+    return false;
+  }
+  async function after(user, token, silent) {
     if (token) setToken(token);
     setLogged(true);
     window._user = user;
     try { window.Shell?.paintUser?.(user); } catch {}
     const na = document.getElementById('navAdmin');
     if (na) na.hidden = user?.role !== 'admin';
+    const nc2 = document.getElementById('navCompress');
+    if (nc2) nc2.hidden = user?.role !== 'admin';
     const nc = document.getElementById('navCf');
     if (nc) nc.hidden = !(user?.role === 'admin' || user?.dev);
+    if (!await gateTerms(user)) return;
     try { Drive.refresh(); Profiles.refresh(); Playlists.refresh(); } catch (e) { console.warn(e); }
   }
   // Demo: shell visível + mocks pra validar sidebar, telas, player sem API.

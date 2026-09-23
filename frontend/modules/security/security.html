@@ -1,0 +1,19 @@
+<h1 class="sp-greet">Segurança 🛡</h1>
+
+<div class="card"><h2 class="card-title">🔑 Senhas que nem nós vemos</h2>
+<p class="hint">Sua senha vira um código irreversível antes de guardar. Ninguém — nem o admin — consegue ler sua senha. Esqueceu? Só redefinindo (com link de 1h ou temporária do admin, que te desloga de tudo).</p></div>
+<div class="card mt-4"><h2 class="card-title">🔒 Segunda camada (2FA)</h2>
+<p class="hint">Código de 6 dígitos do app autenticador + códigos reserva de uso único. Mesmo vazando sua senha, sem o código não entra.</p></div>
+<div class="card mt-4"><h2 class="card-title">🗝 Segredos criptografados</h2>
+<p class="hint">Tokens e credenciais guardados com criptografia moderna (AES-256). Chaves fora do código, só no servidor.</p></div>
+<div class="card mt-4"><h2 class="card-title">👤 Cada um no seu quadrado</h2>
+<p class="hint">Você só enxerga seus arquivos — nem por link chutado, nem por busca. Lixeira e cofre obedecem a mesma regra. Ações sensíveis do admin ficam registradas em auditoria.</p></div>
+<div class="card mt-4"><h2 class="card-title">📦 Arquivos íntegros</h2>
+<p class="hint">Cada upload ganha uma impressão digital (SHA-256): qualquer corrupção é detectada, duplicata não baixa 2x e executáveis/HTML suspeitos sempre descem como anexo, nunca executam no navegador.</p></div>
+<div class="card mt-4"><h2 class="card-title">🛡 Contra abuso</h2>
+<p class="hint">Limites anti-força-bruta no login, cotas por usuário e HTTPS na produção. Sessões expiram e morrem no logout global.</p></div>
+<div class="card mt-4"><h2 class="card-title">🧑‍💻 Para desenvolvedores</h2>
+<p class="hint">Autenticação: bcrypt (custo 10) + JWT 12h com versionamento (logout global invalida tudo) + TOTP com códigos reserva de uso único + Google OAuth por código (sem segredo no front).<br><br>
+Dados: isolamento total por dono (toda leitura confere propriedade), segredos em AES-256-GCM, cofre com senha + travamento por sessão, integridade SHA-256 por arquivo.<br><br>
+Transporte e navegador: Helmet (CSP restrita, anti-clickjacking), CORS por allowlist, tipos ativos (HTML/JS/SVG/executáveis) sempre como anexo com `nosniff`.<br><br>
+Abuso e privacidade: rate-limit dedicado no login, limites por usuário no resto, quota pessimista no upload, lista do admin sem e-mail, buscas e resets auditados com IP e hora.</p></div>

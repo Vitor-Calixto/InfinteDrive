@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
-import { readCollection } from '../config/store.js';
+import { readCollection, upsertRow } from '../config/store.js';
 import { linkRefresh } from '../services/importService.js';
 import {
   createUser, verifyUser, signToken, publicUser,
@@ -313,6 +313,19 @@ r.get('/google/callback', async (req, res) => {
   } catch {
     return back('Falha ao vincular.');
   }
+});
+
+// PATCH /api/auth/accept-terms — registra aceite dos Termos (data/hora). 1x.
+r.patch('/accept-terms', requireAuth, (req, res) => {
+  try {
+    if (!req.user?.id || req.user.id === 'master') return res.json({ ok: true });
+    const u = findById(req.user.id);
+    if (!u) return res.status(404).json({ error: 'Conta sumiu.' });
+    u.acceptedTermsAt = new Date().toISOString();
+    upsertRow('users', u);
+    appendAudit({ userId: u.id, action: 'accept-terms', ip: req.ip, detail: 'v1.1' });
+    return res.json({ ok: true, at: u.acceptedTermsAt });
+  } catch (e) { return res.status(400).json({ error: e.message }); }
 });
 
 r.get('/me', requireAuth, (req, res) => {

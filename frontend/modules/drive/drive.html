@@ -28,3 +28,10 @@
 </div>
 <div id="dlQueue" class="upq" hidden></div>
 <div id="filesGrid" class="sp-grid"><span class="text-zinc-500 text-xs">Carregando…</span></div>
+<div id="driveHotbar" class="drive-hotbar">
+  <button class="btn-ghost" onclick="Drive.selectMode()">☑ Selecionar</button>
+  <button class="btn-ghost" onclick="DlQueue.start()">⬇ Baixar lista</button>
+  <button class="btn-ghost" onclick="Drive.cleanAll()">🗑 Excluir tudo</button>
+  <button class="btn-ghost" onclick="Drive.refresh()">Atualizar</button>
+  <button class="btn-ghost" onclick="document.getElementById('viewHost').scrollTop=0">⬆ Topo</button>
+</div>

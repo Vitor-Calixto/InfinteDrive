@@ -9,7 +9,9 @@ const Shell = (() => {
     import: { html: 'modules/import/import.html', css: 'modules/import/import.css', onShow: () => ImportMod.show() },
     admin: { html: 'modules/admin/admin.html', css: 'modules/admin/admin.css', onShow: () => Admin.show() },
     cloudflare: { html: 'modules/cloudflare/cloudflare.html', css: 'modules/cloudflare/cloudflare.css', js: null, onShow: () => Cf.show() },
+    compressdoc: { html: 'modules/compressdoc/compressdoc.html', css: null, onShow: () => CompressDoc.show() },
     terms: { html: 'modules/terms/terms.html', css: null, onShow: () => Terms.show() },
+    security: { html: 'modules/security/security.html', css: null, onShow: () => {} },
     trash: { html: 'modules/trash/trash.html', css: 'modules/trash/trash.css', onShow: () => Trash.show() },
     vault: { html: 'modules/vault/vault.html', css: 'modules/vault/vault.css', onShow: () => Vault.show() },
   };
