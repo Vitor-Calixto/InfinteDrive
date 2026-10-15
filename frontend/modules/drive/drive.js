@@ -13,6 +13,33 @@ const Drive = (() => {
   const isDemo = () => location.search.includes('demo') || location.hash.includes('demo');
 
   let pollTimer = null;
+  // Pastas = playlists (backend real): filtra o drive ou cria/exclui.
+  function paintFolders() {
+    const g = $('foldersGrid');
+    if (!g) return;
+    let pls = [];
+    try { pls = Playlists.all(); } catch {}
+    const c = $('folderCount');
+    if (c) c.textContent = pls.length ? `${pls.length}` : '';
+    g.innerHTML = pls.map((p) => `
+      <div class="folder-card ${playlistFilter === p.id ? 'sel' : ''}" onclick="Drive.folderOpen('${p.id}')" title="${esc(p.name)}">
+        <span class="folder-name">${p.locked ? '🔒' : '📁'} ${esc(p.name)}</span>
+        <button class="folder-x" title="Excluir pasta" onclick="event.stopPropagation();Drive.folderDel('${p.id}')">✕</button>
+      </div>`).join('') || '<span class="text-zinc-500 text-xs">Sem pastas. Crie a primeira. ＋</span>';
+  }
+  function folderOpen(pid) {
+    setPlaylist(playlistFilter === pid ? '' : pid);
+    const grid = $('filesGrid');
+    if (grid) grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  async function folderNew() {
+    const pl = await Playlists.create();
+    if (pl) { paintFolders(); toast(`Pasta ${pl.name} pronta. ✅`); }
+  }
+  async function folderDel(pid) {
+    await Playlists.remove(pid);
+    paintFolders();
+  }
   async function refresh() {
     if (isDemo()) { useMock(); return; }
     if (!getToken()) return;
@@ -21,6 +48,7 @@ const Drive = (() => {
       window._files = allFiles;
       render();
       paintProc();
+      paintFolders();
       refreshQuota();
       ensurePoll();
     } catch {}
@@ -64,6 +92,9 @@ const Drive = (() => {
       const set = (id, v) => { const el = $(id); if (el) el.textContent = v; };
       set('qUseMini', `${fmtMB(q.finalMB)} / ${fmtMB(q.quotaMB)}`);
       const bar = $('qBarMini'); if (bar) bar.style.width = Math.min(100, (q.finalMB / q.quotaMB) * 100).toFixed(1) + '%';
+      set('storageWidgetText', `${fmtMB(q.finalMB)} / ${fmtMB(q.quotaMB)}`);
+      const wf = $('storageWidgetFill');
+      if (wf) wf.style.width = Math.max(2, Math.min(100, (q.finalMB / q.quotaMB) * 100)).toFixed(1) + '%';
       set('pmQuota', `Ocupando ${fmtMB(q.finalMB)} de ${fmtMB(q.quotaMB)}`);
       if (window.System?.paint) window.System.paint(q);
     } catch {}
@@ -71,11 +102,25 @@ const Drive = (() => {
   function show() {
     const s = $('sortSel');
     if (s) s.value = sortMode;
+    paintViewToggle();
     refresh();
   }
   function clearSearchInput() {
     searchTerm = ''; serverIds = null;
     const si = $('search'); if (si) si.value = '';
+  }
+  // Grade ou lista (estilo Spotify). Persistido.
+  let viewMode = localStorage.getItem('infdrive_view') || 'grid';
+  function setView(v) {
+    viewMode = v === 'list' ? 'list' : 'grid';
+    try { localStorage.setItem('infdrive_view', viewMode); } catch {}
+    paintViewToggle();
+    render();
+  }
+  function paintViewToggle() {
+    const g = $('viewGridBtn'), l = $('viewListBtn');
+    if (g) g.classList.toggle('active', viewMode === 'grid');
+    if (l) l.classList.toggle('active', viewMode === 'list');
   }
   // Multisseleção: marca vários cards e joga numa playlist de uma vez.
   let selecting = false;
@@ -276,6 +321,8 @@ const Drive = (() => {
       const total = allFiles.filter((f) => !f.trashedAt).length;
       c.textContent = list.length === total ? `${total} arquivo(s)` : `${list.length} de ${total}`;
     }
+    if (viewMode === 'list') return renderList(list);
+    grid.className = 'sp-grid';
     grid.innerHTML = list.map((f) => {
       const sel = selecting && selected.has(f.id);
       const click = selecting ? 'Drive.toggleSelect(\'' + f.id + '\')' : 'Share.open(\'' + f.id + '\')';
@@ -305,6 +352,50 @@ const Drive = (() => {
         ? '<span class="text-zinc-500 text-xs">Nada achado. Limpe a busca ou troque o filtro. 🔍</span>'
         : '<span class="text-zinc-500 text-xs">Nada aqui ainda. Arraste arquivos acima. ⬆</span>');
   }
+  // Lista estilo Spotify: # · capa+nome · tipo · tamanho · duração · ações.
+  function renderList(list) {
+    const grid = $('filesGrid');
+    grid.className = 'sp-list';
+    const fmtDate = (iso) => { try { return new Date(iso).toLocaleDateString('pt-BR'); } catch { return ''; } };
+    grid.innerHTML = `
+      <div class="sp-row sp-row-head"><span>#</span><span>Nome</span><span>Tipo</span><span>Tamanho</span><span>Data</span><span></span></div>` +
+      (list.map((f, i) => `
+      <div class="sp-row" onclick="Drive.playFrom('${f.id}')">
+        <span class="sp-row-idx">${i + 1}</span>
+        <span class="sp-row-name">${f.thumb ? `<img src="${thumbUrl(f.id)}" loading="lazy" />` : `<span>${icon(f)}</span>`}<b title="${esc(f.name)}">${esc(f.name)}</b></span>
+        <span class="sp-row-tag">${kindOf(f)}</span>
+        <span class="sp-row-mono">${fmtMB((f.sizeFinal ?? f.sizeOrig) / 1048576)}</span>
+        <span class="sp-row-date">${f.duration ? fmtDur(f.duration) + ' · ' : ''}${fmtDate(f.createdAt)}</span>
+        <span class="sp-row-acts">
+          <button title="Detalhes" onclick="event.stopPropagation();Drive.detail('${f.id}')">ℹ</button>
+          <button title="Mais" onclick="event.stopPropagation();Drive.menu('${f.id}',event)">⋮</button>
+        </span>
+      </div>`).join('') || '<span class="text-zinc-500 text-xs">Nada aqui ainda. ⬆</span>');
+  }
+  function playFrom(fid) {
+    const list = visible();
+    const f = list.find((x) => x.id === fid);
+    if (!f) return;
+    if (selecting) return toggleSelect(fid);
+    if (kindOf(f) === 'audio') Player.playList(list.filter((x) => kindOf(x) === 'audio'), fid);
+    else Share.open(fid);
+  }
+  function detail(fid) {
+    const f = allFiles.find((x) => x.id === fid);
+    if (!f) return;
+    const k = { image: 'Foto', audio: 'Música', video: 'Vídeo', doc: 'Arquivo' }[kindOf(f)];
+    $('detailIcon').textContent = icon(f);
+    $('detailName').textContent = f.name || '';
+    $('detailType').textContent = `${k}${f.broken ? ' · ⚠️ quebrado na origem' : ''}${f.compressed ? '' : ' · ⏳ comprimindo'}`;
+    $('detailPreview').innerHTML = f.thumb ? `<img src="${thumbUrl(f.id)}" />` : '';
+    $('detailSize').textContent = fmtMB((f.sizeFinal ?? f.sizeOrig) / 1048576);
+    $('detailOrig').textContent = fmtMB((f.sizeOrig || 0) / 1048576);
+    try { $('detailDate').textContent = new Date(f.createdAt).toLocaleDateString('pt-BR'); } catch { $('detailDate').textContent = '–'; }
+    $('detailDl').onclick = () => download(fid);
+    $('detailCopy').onclick = () => copyLink(fid);
+    $('detailModal').hidden = false;
+  }
+  function closeDetail() { const m = $('detailModal'); if (m) m.hidden = true; }
   // Ícones SVG (emoji 🗑 vira ⬛ em Windows sem fonte colorida).
   const ICO_TRASH = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>';
   const ICO_SEND = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>';
@@ -552,6 +643,6 @@ const Drive = (() => {
       try { window.Upload?.watchProcessing?.(); } catch {}
     } catch (e) { toast('Erro: ' + e.message); }
   }
-  return { show, refresh, renderMock, refreshQuota, filterKind, setSearch, setServerResults, setSort, setPlaylist, render, del, cleanAll, cleanBroken, recompress, openFile, menu, menuBack, moveMenu, moveTo, moveNew, toggleStar, vaultMove, vaultNew, rename, download, offline, copyLink, sendFile, addMode, addOne, selectMode, toggleSelect, addSelected, delSelected, dlSelected, copySelected, thumbUrl, dlUrl, icon, visible: () => visible(), all: () => allFiles };
+  return { show, refresh, renderMock, refreshQuota, filterKind, setSearch, setServerResults, setSort, setView, setPlaylist, render, del, cleanAll, cleanBroken, recompress, openFile, menu, menuBack, moveMenu, moveTo, moveNew, toggleStar, vaultMove, vaultNew, rename, download, offline, copyLink, sendFile, addMode, addOne, selectMode, toggleSelect, addSelected, delSelected, dlSelected, copySelected, playFrom, detail, closeDetail, folderOpen, folderNew, folderDel, thumbUrl, dlUrl, icon, visible: () => visible(), all: () => allFiles };
 })();
 window.Drive = Drive;

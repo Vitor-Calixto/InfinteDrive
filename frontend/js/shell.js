@@ -17,13 +17,14 @@ const Shell = (() => {
   };
   const loaded = {};
   let current = 'drive';
+  const ASSETV = 'v17'; // sobe a cada deploy: mata cache velho de css/js/html
 
   function ensureCss(href) {
     const list = Array.isArray(href) ? href : [href];
     for (const h of list) {
       if (!h || document.querySelector(`link[data-mod="${h}"]`)) continue;
       const l = document.createElement('link');
-      l.rel = 'stylesheet'; l.href = h; l.dataset.mod = h;
+      l.rel = 'stylesheet'; l.href = h + '?v=' + ASSETV; l.dataset.mod = h;
       document.head.appendChild(l);
     }
   }
@@ -38,7 +39,7 @@ const Shell = (() => {
     if (!loaded[name]) {
       try {
         const v = VIEWS[name];
-        const r = await fetch(v.html);
+        const r = await fetch(v.html + '?v=' + ASSETV);
         if (!r.ok) throw new Error('view ' + name);
         const wrap = document.createElement('div');
         wrap.id = 'view-' + name;
@@ -63,6 +64,13 @@ const Shell = (() => {
     ev?.stopPropagation();
     document.body.classList.toggle('sidebar-hidden');
     localStorage.setItem('infdrive_sidebar', isHidden() ? 'hidden' : 'shown');
+    paintNav();
+    closeProfileMenu();
+  }
+  function openSidebar(ev) {
+    ev?.stopPropagation();
+    document.body.classList.remove('sidebar-hidden');
+    localStorage.setItem('infdrive_sidebar', 'shown');
     paintNav();
     closeProfileMenu();
   }
@@ -158,7 +166,7 @@ const Shell = (() => {
   // auto-boot (shell é o último script)
   try { boot(); } catch (e) { console.warn(e); }
 
-  return { show, toggleSidebar: toggleSidebarOnly, toggleCriar, closeProfileMenu, paintUser, paintMenu, boot, current: () => current };
+  return { show, toggleSidebar: toggleSidebarOnly, openSidebar, toggleCriar, closeProfileMenu, paintUser, paintMenu, boot, current: () => current };
 })();
 window.Shell = Shell;
 // toggleSidebar: o hamburger do canto superior esquerdo alterna a sidebar única.

@@ -9,10 +9,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icons/icon-180.png" />
-<link rel="stylesheet" href="css/responsive.css" />
+<link rel="stylesheet" href="css/responsive.css?v=17" />
   <title>Deploy Center — Drive Spotify</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%231DB954'/%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/style.css?v=17" />
 </head>
 <body>
   <!-- AUTH -->
@@ -62,6 +62,7 @@
       <button id="navToggle" class="sp-navtoggle" onclick="Shell.toggleSidebar(event)" title="Biblioteca — abrir / recolher" aria-label="Abrir ou recolher biblioteca"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="2" y1="4" x2="16" y2="4"/><line x1="2" y1="9" x2="16" y2="9"/><line x1="2" y1="14" x2="16" y2="14"/></svg></button>
       <div class="sp-side-card nav-card">
         <div class="sp-logo"><span class="sp-logo-dot"></span> <span class="side-label">Deploy Center</span></div>
+        <button class="sp-upload-btn" onclick="Upload.pick()">＋ NOVO UPLOAD</button>
         <nav class="sp-nav">
           <button class="sp-nav-btn active" data-view="drive" onclick="Shell.show('drive')">🏠 <span class="side-label">Início</span></button>
           <button class="sp-nav-btn" onclick="Search.focus()"><span class="nav-icon">🔍</span> <span class="side-label">Buscar</span></button>
@@ -101,6 +102,13 @@
             <button class="sp-nav-btn" data-view="security" onclick="Shell.show('security')">🛡 <span class="side-label">Segurança</span></button>
           </nav>
         </div>
+        <div class="sp-storage-widget">
+          <div class="flex justify-between items-center text-xs font-semibold">
+            <span class="text-zinc-400">Armazenamento</span>
+            <span id="storageWidgetText" class="sp-green-mono">–</span>
+          </div>
+          <div class="sp-storage-track"><div id="storageWidgetFill"></div></div>
+        </div>
       </div>
     </aside>
 
@@ -121,9 +129,8 @@
   <nav id="mobileNav">
     <button class="sp-nav-btn active" data-view="drive" onclick="Shell.show('drive')">🏠<span>Início</span></button>
     <button class="sp-nav-btn" onclick="Search.focus()">🔍<span>Buscar</span></button>
-    <button class="sp-nav-btn" data-view="playlists" onclick="Shell.show('playlists')">🎶<span>Playlists</span></button>
-    <button class="sp-nav-btn" data-view="import" onclick="Shell.show('import')">📥<span>Trazer</span></button>
-    <button class="sp-nav-btn" data-view="trash" onclick="Shell.show('trash')">🗑<span>Lixeira</span></button>
+    <button class="sp-nav-btn" onclick="Shell.openSidebar(event)">📚<span>Sua Biblioteca</span></button>
+    <button class="sp-nav-btn" onclick="Shell.toggleCriar(event)">＋<span>Criar</span></button>
   </nav>
 
   <footer id="player" class="sp-player" hidden>
@@ -133,9 +140,11 @@
     </div>
     <div class="sp-player-center">
       <div class="sp-p-btns">
+        <button id="pShuffle" onclick="Player.toggleShuffle()" title="Aleatório" style="font-size:14px">🔀</button>
         <button onclick="Player.prev()" title="Anterior">⏮</button>
         <button id="pToggle" onclick="Player.toggle()" class="sp-play-btn" title="Play/Pause">⏸</button>
         <button onclick="Player.next()" title="Próxima">⏭</button>
+        <button id="pRepeat" onclick="Player.toggleRepeat()" title="Repetir" style="font-size:14px">🔁</button>
       </div>
       <div class="sp-p-track" id="pTrack" onclick="Player.seek(event)">
         <div class="sp-p-fill" id="pFill"></div>
@@ -143,7 +152,7 @@
       <div class="sp-p-times"><span id="pCur">0:00</span><span id="pDur">0:00</span></div>
       <audio id="audio" preload="metadata" hidden></audio>
     </div>
-    <div class="sp-player-right"><button onclick="Player.close()" class="sp-p-close" title="Fechar">✕</button></div>
+    <div class="sp-player-right"><input id="pVol" type="range" min="0" max="100" value="80" oninput="Player.setVolume(this.value)" class="sp-p-vol" title="Volume" /><button onclick="Player.close()" class="sp-p-close" title="Fechar">✕</button></div>
   </footer>
 
   <div id="modal" class="sp-modal" hidden onclick="if(event.target===this)Share.closeModal()">
@@ -176,26 +185,26 @@
     </div>
   </div>
 
-  <script src="js/core.js"></script>
-  <script src="modules/auth/auth.js"></script>
-  <script src="modules/auth/twofa.js"></script>
-  <script src="modules/drive/drive.js"></script>
-  <script src="modules/playlists/playlists.js"></script>
-  <script src="modules/player/player.js"></script>
-  <script src="modules/search/search.js"></script>
-  <script src="modules/upload/upload.js"></script>
-  <script src="modules/download/download.js"></script>
-  <script src="modules/share/share.js"></script>
-  <script src="modules/vault/vault.js"></script>
-  <script src="modules/profiles/profiles.js"></script>
-  <script src="modules/trash/trash.js"></script>
-  <script src="modules/system/system.js"></script>
-  <script src="modules/import/import.js"></script>
-  <script src="modules/admin/admin.js"></script>
-  <script src="modules/terms/terms.js"></script>
-  <script src="modules/cloudflare/cloudflare.js"></script>
-  <script src="modules/compressdoc/compressdoc.js"></script>
-  <script src="modules/planos/planos.js"></script>
-  <script src="js/shell.js"></script>
+  <script src="js/core.js?v=17"></script>
+  <script src="modules/auth/auth.js?v=17"></script>
+  <script src="modules/auth/twofa.js?v=17"></script>
+  <script src="modules/drive/drive.js?v=17"></script>
+  <script src="modules/playlists/playlists.js?v=17"></script>
+  <script src="modules/player/player.js?v=17"></script>
+  <script src="modules/search/search.js?v=17"></script>
+  <script src="modules/upload/upload.js?v=17"></script>
+  <script src="modules/download/download.js?v=17"></script>
+  <script src="modules/share/share.js?v=17"></script>
+  <script src="modules/vault/vault.js?v=17"></script>
+  <script src="modules/profiles/profiles.js?v=17"></script>
+  <script src="modules/trash/trash.js?v=17"></script>
+  <script src="modules/system/system.js?v=17"></script>
+  <script src="modules/import/import.js?v=17"></script>
+  <script src="modules/admin/admin.js?v=17"></script>
+  <script src="modules/terms/terms.js?v=17"></script>
+  <script src="modules/cloudflare/cloudflare.js?v=17"></script>
+  <script src="modules/compressdoc/compressdoc.js?v=17"></script>
+  <script src="modules/planos/planos.js?v=17"></script>
+  <script src="js/shell.js?v=17"></script>
 </body>
 </html>

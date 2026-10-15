@@ -1,6 +1,7 @@
 // player.js — barra inferior: fila, auto-next, erros, MediaSession (tela bloqueio).
 const Player = (() => {
   let queue = []; let idx = -1;
+  let shuffle = false, repeat = false;
   function paintTime() {
     const a = $('audio');
     if (!a) return;
@@ -21,7 +22,7 @@ const Player = (() => {
     const a = $('audio');
     if (!a || a._bound) return;
     a._bound = true;
-    a.addEventListener('ended', () => next());
+    a.addEventListener('ended', () => next(true));
     a.addEventListener('timeupdate', paintTime);
     a.addEventListener('loadedmetadata', paintTime);
     a.addEventListener('error', () => {
@@ -69,9 +70,34 @@ const Player = (() => {
     if (wantPlay) { a.play().catch(() => {}); $('pToggle').textContent = '⏸'; }
     else { a.pause(); $('pToggle').textContent = '▶'; }
   }
-  function next() { if (!queue.length) return; idx = (idx + 1) % queue.length; current(); }
+  function next(auto) {
+    if (!queue.length) return;
+    if (auto && repeat && queue.length === 1) { current(); return; }
+    if (shuffle && queue.length > 1) {
+      let n = idx;
+      while (n === idx) n = Math.floor(Math.random() * queue.length);
+      idx = n;
+    } else idx = (idx + 1) % queue.length;
+    current();
+  }
   function prev() { if (!queue.length) return; idx = (idx - 1 + queue.length) % queue.length; current(); }
+  function toggleShuffle() {
+    shuffle = !shuffle;
+    const b = $('pShuffle');
+    if (b) b.classList.toggle('on', shuffle);
+    toast(shuffle ? 'Aleatório ligado. 🔀' : 'Aleatório desligado.');
+  }
+  function toggleRepeat() {
+    repeat = !repeat;
+    const b = $('pRepeat');
+    if (b) b.classList.toggle('on', repeat);
+    toast(repeat ? 'Repetir ligado. 🔁' : 'Repetir desligado.');
+  }
+  function setVolume(v) {
+    const a = $('audio');
+    if (a) a.volume = Math.max(0, Math.min(1, (Number(v) || 0) / 100));
+  }
   function close() { try { $('audio').pause(); } catch {} $('player').hidden = true; queue = []; idx = -1; }
-  return { playList, toggle, next, prev, close, seek };
+  return { playList, toggle, next, prev, close, seek, toggleShuffle, toggleRepeat, setVolume };
 })();
 window.Player = Player;

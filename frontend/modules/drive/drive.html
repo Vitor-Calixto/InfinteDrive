@@ -7,10 +7,21 @@
 <div id="upQueue" class="upq" hidden></div>
 <div id="procBanner" class="proc-banner" hidden></div>
 <div id="addBanner" class="proc-banner" hidden></div>
-<div class="flex justify-between items-center mt-5 mb-2">
+<div id="foldersWrap">
+  <div class="flex justify-between items-center mt-5 mb-2">
+    <h2 class="sp-h2">📁 Pastas <span id="folderCount" class="text-xs text-zinc-400"></span></h2>
+    <button onclick="Drive.folderNew()" class="btn-ghost">＋ Nova pasta</button>
+  </div>
+  <div id="foldersGrid" class="folder-grid"></div>
+</div>
+<div class="flex justify-between items-center mt-5 mb-2 drive-head">
   <h2 class="sp-h2">Seus arquivos <span id="fileCount" class="text-xs text-zinc-400"></span></h2>
   <div id="selBanner" class="proc-banner" hidden></div>
   <div class="flex gap-2">
+    <div class="view-toggle">
+      <button id="viewGridBtn" onclick="Drive.setView('grid')" title="Grade">▦</button>
+      <button id="viewListBtn" onclick="Drive.setView('list')" title="Lista">☰</button>
+    </div>
     <select id="sortSel" class="inp" style="width:auto;margin:0" onchange="Drive.setSort(this.value)">
       <option value="recent">Mais recentes</option>
       <option value="oldest">Mais antigos</option>
@@ -28,10 +39,29 @@
 </div>
 <div id="dlQueue" class="upq" hidden></div>
 <div id="filesGrid" class="sp-grid"><span class="text-zinc-500 text-xs">Carregando…</span></div>
+<div id="detailModal" class="sp-modal" hidden onclick="if(event.target===this)Drive.closeDetail()">
+  <div class="detail-card">
+    <button class="sp-modal-x detail-x" onclick="Drive.closeDetail()">✕</button>
+    <div class="detail-head">
+      <div id="detailIcon" class="detail-icon">📄</div>
+      <div><div id="detailName" class="detail-name">–</div><div id="detailType" class="detail-type">–</div></div>
+    </div>
+    <div id="detailPreview" class="detail-preview"></div>
+    <div class="detail-stats">
+      <div><span>Tamanho</span><b id="detailSize">–</b></div>
+      <div><span>Guardado</span><b id="detailOrig">–</b></div>
+      <div><span>Data</span><b id="detailDate">–</b></div>
+    </div>
+    <div class="flex gap-2 mt-2">
+      <button id="detailDl" class="btn">⬇ Baixar</button>
+      <button id="detailCopy" class="btn-ghost">🔗 Copiar link</button>
+    </div>
+  </div>
+</div>
 <div id="driveHotbar" class="drive-hotbar">
-  <button class="btn-ghost" onclick="Drive.selectMode()">☑ Selecionar</button>
-  <button class="btn-ghost" onclick="DlQueue.start()">⬇ Baixar lista</button>
-  <button class="btn-ghost" onclick="Drive.cleanAll()">🗑 Excluir tudo</button>
-  <button class="btn-ghost" onclick="Drive.refresh()">Atualizar</button>
-  <button class="btn-ghost" onclick="document.getElementById('viewHost').scrollTop=0">⬆ Topo</button>
+  <button onclick="Drive.selectMode()"><b>☑</b><span>Selecionar</span></button>
+  <button onclick="DlQueue.start()"><b>⬇</b><span>Baixar</span></button>
+  <button onclick="Drive.cleanAll()"><b>🗑</b><span>Excluir</span></button>
+  <button onclick="Drive.refresh()"><b>⟳</b><span>Atualizar</span></button>
+  <button onclick="document.getElementById('viewHost').scrollTop=0"><b>⬆</b><span>Topo</span></button>
 </div>

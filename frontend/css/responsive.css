@@ -14,15 +14,11 @@
   .sp-search{font-size:12px;padding:9px 12px;min-width:0}
   .sp-greet{font-size:22px}
   .sp-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
-  #mobileNav{display:flex;position:fixed;left:0;right:0;bottom:0;min-height:62px;padding-bottom:env(safe-area-inset-bottom);background:rgba(10,10,10,.96);backdrop-filter:blur(12px);border-top:1px solid rgba(255,255,255,.08);z-index:60;justify-content:space-around;align-items:center}
-  #mobileNav .sp-nav-btn{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:19px;color:#b3b3b3}
-  #mobileNav .sp-nav-btn.active{color:#fff}
-  #mobileNav .sp-nav-btn span{font-size:10px;font-weight:400}
-  .sp-player{bottom:calc(62px + env(safe-area-inset-bottom));min-height:64px}
+  .sp-player{min-height:64px}
   .sp-p-meta{display:none}
   .sp-album-row .btn-ghost{padding:9px 10px}
   .sp-album-more{width:36px;height:36px}
-  .drive-hotbar{bottom:calc(70px + env(safe-area-inset-bottom))}
+  .drive-hotbar{bottom:calc(70px + env(safe-area-inset-bottom));max-width:calc(100vw - 24px);overflow-x:auto;justify-content:flex-start}
 }
 @media (max-width:700px){
   .plan-grid{grid-template-columns:1fr}
@@ -34,7 +30,7 @@
 }
 @media (max-width:480px){
   .sp-main{padding:10px 10px 170px}
-  .drive-hotbar{gap:6px;padding:8px 10px}
-  .drive-hotbar .btn-ghost{padding:7px 10px;font-size:11px}
+  .drive-hotbar{gap:4px;padding:5px 8px}
+  .drive-hotbar .btn-ghost{padding:5px 8px;font-size:11px}
   .upq-name{max-width:38vw}
 }
